@@ -5,10 +5,9 @@ Integrantes, matriculas y contribuciones:
 1. Gael Alexander Zaragoza Torres - A01385956
    Contribucion: MST (Prim y Kruskal), TSP, lector/escritor JSON, esqueleto del repositorio, README.
 
-2. NOMBRE_COMPANERO_2 - MATRICULA_2
+2. Damian Alejandro Gómez Mena - A01385923 
    Contribucion: (flujo maximo y Voronoi, o cadenas y aplicacion; completar)
 
-3. NOMBRE_COMPANERO_3 - MATRICULA_3
+3. David Rangel Monsivais - A01385671
    Contribucion: (completar)
 
-4. (pendiente: confirmar con el profesor si el equipo puede ser de 3 integrantes)
