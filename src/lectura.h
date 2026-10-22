@@ -1,7 +1,7 @@
 /*
  * Descripcion: funciones auxiliares para leer datos tolerantes desde JSON (numeros, textos,
  * listas de textos, puntos y matrices), compartidas por los modos de TSP, Voronoi y cadenas.
- * Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
+ * Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena (A01385923), David Rangel Monsivais (A01385671)
  * Fecha: 21/10/2026
  */
 

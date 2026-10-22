@@ -1,0 +1,11 @@
+{
+  "nombre": "Ejemplo oficial de la pagina",
+  "descripcion": "Las dos transmisiones y las tres firmas que publica el reto, con la red GEANT de fondo. Sirve para comprobar a mano que la consola da los valores esperados: ABBA en 13 y 11, FF en 11 y 9, DEAD en ninguna; palindromos 2-8 y 7-12; subcadena comun 3-8.",
+  "fuente": "Pagina del hackathon, seccion Laboratorio",
+  "nodos": "nodes.txt",
+  "enlaces": "links.txt",
+  "demandas": "demands.txt",
+  "flujo": {"origen": "at1.at", "destino": "de1.de"},
+  "transmisiones": ["AABCDCBA12FFABBA", "00BCDCBAFFABBA77"],
+  "firmas": ["ABBA", "FF", "DEAD"]
+}

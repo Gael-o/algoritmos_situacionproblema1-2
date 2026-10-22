@@ -1,7 +1,7 @@
 /*
  * Descripcion: flujo maximo entre un nodo fuente y un nodo sumidero con el algoritmo de Dinic
  * (busqueda por niveles + caminos bloqueantes), mas el adaptador JSON del modo de flujo maximo.
- * Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
+ * Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena (A01385923), David Rangel Monsivais (A01385671)
  * Fecha: 21/10/2026
  */
 

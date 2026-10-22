@@ -32,14 +32,15 @@ table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px
 </style>
 </head>
 <body>
-<header><h1>SENTINEL Digital Twin &mdash; red GÉANT</h1><p>Todos los cálculos los hace el programa en C++ (<code>./sentinel</code>); esta página solo arma la entrada y dibuja la salida.</p></header>
+<header><h1>SENTINEL Digital Twin &mdash; red GÉANT</h1><p>Todos los cálculos los hace el programa en C++ (<code>./sentinel</code>); esta página solo arma la entrada y dibuja la salida.</p>
+<p>Caso de prueba activo: <strong id="activeScenario">—</strong></p></header>
 <nav id="tabs"></nav>
 <main>
 <div>
  <section><h2 id="mapTitle">Mapa</h2>
   <svg id="map" viewBox="0 0 700 520" role="img" aria-label="Mapa de la red GÉANT"></svg>
   <p class="note" id="mapNote"></p>
-  <label><input type="checkbox" id="showNY" style="width:auto"> Mostrar Nueva York (ny1)</label>
+  <label id="nyBox"><input type="checkbox" id="showNY" style="width:auto"> Mostrar Nueva York (ny1)</label>
  </section>
 </div>
 <div id="side"></div>
@@ -76,10 +77,11 @@ function drawMap(){
   svg.appendChild(el("circle",{cx:P[i][0],cy:P[i][1],r:hi?7:5,fill:hi?"var(--route)":"var(--acc)"}));
   svg.appendChild(el("text",{x:P[i][0]+8,y:P[i][1]-6,"font-size":"11",fill:"var(--ink)"},n.name.split(".")[0]))});
  document.getElementById("mapNote").textContent=overlay.note||"";
+ document.getElementById("nyBox").classList.toggle("hide",!net.nodes.some(n=>n.name==="ny1.ny"));
 }
 
 function renderTabs(){const nav=document.getElementById("tabs");nav.textContent="";TABS.forEach((t,i)=>{const b=el("button",{class:i===tab?"on":""},t);b.onclick=()=>{tab=i;overlay={};cut=null;renderTabs();render()};nav.appendChild(b)})}
-function nodeSelect(id,def){const s=el("select",{id});net.nodes.forEach((n,i)=>{const o=el("option",{value:i},n.name);if(n.name===def)o.selected=true;s.appendChild(o)});return s}
+function nodeSelect(id,def){const s=el("select",{id});const pick=(typeof def==="number")?def:net.nodes.findIndex(n=>n.name===def);net.nodes.forEach((n,i)=>{const o=el("option",{value:i},n.name);if(i===pick)o.selected=true;s.appendChild(o)});return s}
 function field(side,label,node){side.appendChild(el("label",{},label));side.appendChild(node)}
 function result(side){const r=el("div",{id:"res"});side.appendChild(r);return r}
 function showJSON(box,title,obj,ms){box.textContent="";box.appendChild(el("p",{},title+(ms?"  ("+ms.toFixed(1)+" ms, incluye ida y vuelta al programa)":"")));box.appendChild(el("pre",{},JSON.stringify(obj,null,1).slice(0,4000)))}
@@ -102,7 +104,7 @@ function renderLab(side){
  const tech=el("select",{id:"tech"});field(s,"Técnica (vacío = la de por defecto)",tech);
  const fl=el("div",{id:"fl"});
  const fill=()=>{tech.textContent="";TECH[mode.value].forEach(t=>tech.appendChild(el("option",{value:t},t||"por defecto")));fl.classList.toggle("hide",mode.value!=="maxflow")};
- fl.append(el("label",{},"Origen"),nodeSelect("src","uk1.uk"),el("label",{},"Destino"),nodeSelect("dst","gr1.gr"));s.appendChild(fl);
+ fl.append(el("label",{},"Origen"),nodeSelect("src",net.source),el("label",{},"Destino"),nodeSelect("dst",net.sink));s.appendChild(fl);
  mode.onchange=fill;fill();
  const b=el("button",{class:"run"},"Ejecutar");const c=el("button",{class:"run alt"},"Comparar todas las técnicas");s.append(b,c);
  const box=result(s);
@@ -130,15 +132,21 @@ function renderLab(side){
 function marked(text,ranges){let out=[],pos=0;ranges.slice().sort((a,b)=>a[0]-b[0]).forEach(([a,b])=>{if(a>pos)out.push(document.createTextNode(text.slice(pos,a-1)));out.push(el("mark",{},text.slice(a-1,b)));pos=b});out.push(document.createTextNode(text.slice(pos)));return out}
 function renderCyber(side){
  const s=el("section");s.appendChild(el("h2",{},"Cybersecurity Console"));
- s.appendChild(el("p",{class:"note"},"Las transmisiones se generan con la matriz de tráfico de GÉANT (cada demanda se codifica en hexadecimal). Puedes editarlas."));
- const sig=el("textarea",{id:"sig"});sig.value=[(net.payloads[0]||"").slice(16,24),(net.payloads[1]||"").slice(32,40),"DEADBEEF"].join("\n");
+ s.appendChild(el("p",{class:"note"},(net.scenario&&net.scenario.id==="03_ejemplo_oficial")?"Transmisiones y firmas del ejemplo oficial de la página. Sirven para comprobar a mano que el programa da los valores esperados.":"Las transmisiones se generan con la matriz de tráfico de GÉANT: cada demanda se codifica en hexadecimal. Puedes editarlas, y en Scenario Manager puedes cargar otro caso."));
+ const sig=el("textarea",{id:"sig"});sig.value=(net.signatures||[]).join("\n");
  const t1=el("textarea",{id:"t1"}),t2=el("textarea",{id:"t2"});t1.value=net.payloads[0]||"";t2.value=net.payloads[1]||"";
  field(s,"Firmas de malware (una por línea)",sig);field(s,"Transmisión 1",t1);field(s,"Transmisión 2",t2);
  const b=el("button",{class:"run"},"Analizar");s.appendChild(b);const box=result(s);
  b.onclick=async()=>{const tx=[t1.value,t2.value];box.textContent="";
   const m=await run("matching",{signatures:sig.value.split("\n").map(x=>x.trim()).filter(Boolean),transmissions:tx});
   const p=await run("palindrome",{transmissions:tx});const c=await run("commonsubstr",{transmissions:tx});
-  box.appendChild(el("h2",{},"Firmas (primera posición, 0 = no aparece)"));box.appendChild(el("pre",{},JSON.stringify(m.out.positions||m.out)));
+  box.appendChild(el("h2",{},"Firmas: primera posición de cada una"));
+  const firmas=sig.value.split("\n").map(x=>x.trim()).filter(Boolean);const pos=m.out.positions||[];
+  const tf=el("table");tf.appendChild(el("tr")).append(el("th",{},"Firma"),el("th",{},"Transmisión 1"),el("th",{},"Transmisión 2"));
+  const celda=r=>!r?"?":(r.found?("sí, posición "+r.position):"no aparece");
+  firmas.forEach((f,i)=>{const tr=el("tr");tr.append(el("td",{},f),el("td",{class:(pos[i]||{}).found?"ok":"bad"},celda(pos[i])),el("td",{class:(pos[firmas.length+i]||{}).found?"ok":"bad"},celda(pos[firmas.length+i])));tf.appendChild(tr)});
+  box.appendChild(tf);
+  box.appendChild(el("p",{class:"note"},"Son seis resultados: las tres firmas en la transmisión 1 y luego en la 2, como pide la página."));
   box.appendChild(el("h2",{},"Palíndromo más largo"));
   tx.forEach((x,i)=>{const r=(p.out.ranges||[])[i];const d=el("div",{class:"seq"});if(r)marked(x.replace(/\s/g,"").toUpperCase(),[r]).forEach(n=>d.appendChild(n));box.appendChild(d);box.appendChild(el("p",{class:"note"},"Transmisión "+(i+1)+": posiciones "+(r?r.join("–"):"?")))});
   box.appendChild(el("h2",{},"Subcadena común más larga"));const r=c.out.range;box.appendChild(el("p",{},r?("posiciones "+r.join("–")+" en la transmisión 1 ("+(c.out.length||"")+" caracteres)"):JSON.stringify(c.out)));
@@ -147,10 +155,24 @@ function renderCyber(side){
 }
 
 function renderScenario(side){
- const s=el("section");s.appendChild(el("h2",{},"Scenario Manager — caída de un enlace"));
+ const sc=el("section");sc.appendChild(el("h2",{},"Scenario Manager — casos de prueba"));
+ sc.appendChild(el("p",{class:"note"},"Al cargar un caso, toda la aplicación (mapa, laboratorio y consola) pasa a trabajar con esos datos."));
+ const sel=el("select",{id:"scen"});scenarios.forEach(e=>{const o=el("option",{value:e.id},e.nombre);if(e.id===current)o.selected=true;sel.appendChild(o)});
+ field(sc,"Caso de prueba",sel);
+ const info=el("div");const pinta=()=>{const e=scenarios.find(x=>x.id===sel.value)||{};info.textContent="";info.appendChild(el("p",{class:"note"},e.descripcion||""));info.appendChild(el("p",{class:"note"},"Fuente: "+(e.fuente||"—")))};
+ sel.onchange=pinta;pinta();sc.appendChild(info);
+ const carga=el("button",{class:"run"},"Cargar caso");sc.appendChild(carga);
+ const resumen=el("div");sc.appendChild(resumen);
+ const pintaResumen=()=>{resumen.textContent="";const t=el("table");t.appendChild(el("tr")).append(el("th",{},"Propiedad"),el("th",{},"Valor"));
+  [["Nodos",net.nodes.length],["Enlaces",net.links.length],["Demandas",net.demands],["Transmisiones",(net.payloads||[]).length],["Firmas",(net.signatures||[]).join(", ")]].forEach(r=>{const tr=el("tr");r.forEach(x=>tr.appendChild(el("td",{},String(x))));t.appendChild(tr)});
+  resumen.appendChild(t)};
+ pintaResumen();
+ carga.onclick=async()=>{carga.textContent="Cargando...";await loadScenario(sel.value);carga.textContent="Cargar caso";render()};
+ side.appendChild(sc);
+ const s=el("section");s.appendChild(el("h2",{},"Simulación: caída de un enlace"));
  const ls=el("select",{id:"cut"});net.links.forEach((l,i)=>ls.appendChild(el("option",{value:i},net.nodes[l.u].name+" – "+net.nodes[l.v].name)));
  field(s,"Enlace que deja de funcionar",ls);
- const fl=el("div");fl.append(el("label",{},"Flujo desde"),nodeSelect("ssrc","uk1.uk"),el("label",{},"hasta"),nodeSelect("sdst","gr1.gr"));s.appendChild(fl);
+ const fl=el("div");fl.append(el("label",{},"Flujo desde"),nodeSelect("ssrc",net.source),el("label",{},"hasta"),nodeSelect("sdst",net.sink));s.appendChild(fl);
  const b=el("button",{class:"run"},"Simular caída");s.appendChild(b);const box=result(s);
  b.onclick=async()=>{const i=+ls.value;cut=i;const n=net.nodes.length,A=inputs(-1),B=inputs(i);
   const src=+document.getElementById("ssrc").value,dst=+document.getElementById("sdst").value;
@@ -184,7 +206,9 @@ function renderScenario(side){
 function render(){const side=document.getElementById("side");side.textContent="";
  [renderExplorer,renderLab,renderCyber,renderScenario][tab](side);drawMap()}
 
-(async()=>{net=await (await fetch("/api/network")).json();document.getElementById("showNY").onchange=drawMap;renderTabs();render()})();
+let scenarios=[], current="";
+async function loadScenario(id){const q=id?("?scenario="+encodeURIComponent(id)):"";net=await (await fetch("/api/network"+q)).json();current=net.scenario.id;document.getElementById("activeScenario").textContent=net.scenario.nombre;overlay={};cut=null}
+(async()=>{scenarios=await (await fetch("/api/scenarios")).json();await loadScenario("");document.getElementById("showNY").onchange=drawMap;renderTabs();render()})();
 </script>
 </body>
 </html>

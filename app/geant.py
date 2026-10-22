@@ -2,7 +2,7 @@
 """
 Descripcion: lee la red GEANT de SNDlib (nodos, enlaces y matriz de demandas), construye la entrada JSON
 de cada uno de los siete modos del ejecutable en C++, lo ejecuta y devuelve los resultados.
-Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
+Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena (A01385923), David Rangel Monsivais (A01385671)
 Fecha: 21/10/2026
 
 Uso:
@@ -17,6 +17,7 @@ Archivos de datos (carpeta app/data):
 """
 
 import json
+import random
 import os
 import re
 import subprocess
@@ -71,15 +72,86 @@ def ejecutar(ejecutable, modo, entrada):
     return json.loads(proceso.stdout)
 
 
-def cargarRed(rutaDemandas=None):
+def cargarRed(rutaDemandas=None, rutaNodos=None, rutaEnlaces=None):
     """Carga nodos, enlaces y demandas de GEANT y devuelve un diccionario con todo."""
-    nombres, coordenadas = leerNodos(os.path.join(DATOS, "nodes.txt"))
+    nombres, coordenadas = leerNodos(rutaNodos or os.path.join(DATOS, "nodes.txt"))
     indice = {nombre: i for i, nombre in enumerate(nombres)}
-    enlaces = leerEnlaces(os.path.join(DATOS, "links.txt"), indice)
+    enlaces = leerEnlaces(rutaEnlaces or os.path.join(DATOS, "links.txt"), indice)
     if rutaDemandas is None:
         rutaDemandas = os.path.join(DATOS, "demands.txt")
     demandas = leerDemandas(rutaDemandas, indice)
     return {"nombres": nombres, "coords": coordenadas, "indice": indice, "enlaces": enlaces, "demandas": demandas}
+
+
+def listarEscenarios():
+    """Devuelve la lista de casos de prueba disponibles en app/data/scenarios, ordenados por nombre de archivo."""
+    carpeta = os.path.join(DATOS, "scenarios")
+    escenarios = []
+    if os.path.isdir(carpeta):
+        for nombre in sorted(os.listdir(carpeta)):
+            if nombre.endswith(".json"):
+                with open(os.path.join(carpeta, nombre), encoding="utf-8") as archivo:
+                    definicion = json.load(archivo)
+                escenarios.append({"id": nombre[:-5], "nombre": definicion.get("nombre", nombre[:-5]),
+                                   "descripcion": definicion.get("descripcion", ""),
+                                   "fuente": definicion.get("fuente", "")})
+    return escenarios
+
+
+def generarRed(parametros):
+    """Crea una red sintetica conexa con el numero de nodos y enlaces pedido, para probar escalabilidad."""
+    aleatorio = random.Random(parametros.get("semilla", 2026))
+    total = parametros.get("nodos", 100)
+    nombres = ["n%03d" % i for i in range(total)]
+    coordenadas = [[aleatorio.uniform(-10.0, 35.0), aleatorio.uniform(35.0, 60.0)] for _ in range(total)]
+    enlaces = [(i, aleatorio.randrange(i), 40000.0, float(aleatorio.randint(100, 3000))) for i in range(1, total)]
+    for _ in range(max(0, parametros.get("enlaces", total * 2) - (total - 1))):
+        origen = aleatorio.randrange(total)
+        destino = aleatorio.randrange(total)
+        if origen != destino:
+            enlaces.append((origen, destino, 40000.0, float(aleatorio.randint(100, 3000))))
+    demandas = []
+    for _ in range(parametros.get("demandas", total * 4)):
+        origen = aleatorio.randrange(total)
+        destino = aleatorio.randrange(total)
+        if origen != destino:
+            demandas.append((origen, destino, float(aleatorio.randint(1, 50000))))
+    return {"nombres": nombres, "coords": coordenadas,
+            "indice": {n: i for i, n in enumerate(nombres)}, "enlaces": enlaces, "demandas": demandas}
+
+
+def filtrarNodos(red, excluidos):
+    """Devuelve la red sin los nodos nombrados, renumerando los que quedan."""
+    conservados = [i for i, nombre in enumerate(red["nombres"]) if nombre not in excluidos]
+    nuevo = {viejo: i for i, viejo in enumerate(conservados)}
+    return {
+        "nombres": [red["nombres"][i] for i in conservados],
+        "coords": [red["coords"][i] for i in conservados],
+        "indice": {red["nombres"][i]: nuevo[i] for i in conservados},
+        "enlaces": [(nuevo[u], nuevo[v], c, k) for (u, v, c, k) in red["enlaces"] if u in nuevo and v in nuevo],
+        "demandas": [(nuevo[o], nuevo[d], val) for (o, d, val) in red["demandas"] if o in nuevo and d in nuevo],
+    }
+
+
+def cargarEscenario(idEscenario):
+    """Carga un caso de prueba de app/data/scenarios y devuelve la red mas sus parametros de prueba."""
+    ruta = os.path.join(DATOS, "scenarios", idEscenario + ".json")
+    with open(ruta, encoding="utf-8") as archivo:
+        definicion = json.load(archivo)
+    if "generar" in definicion:
+        red = generarRed(definicion["generar"])
+    else:
+        red = cargarRed(os.path.join(DATOS, definicion.get("demandas", "demands.txt")),
+                        os.path.join(DATOS, definicion.get("nodos", "nodes.txt")),
+                        os.path.join(DATOS, definicion.get("enlaces", "links.txt")))
+    if definicion.get("excluir"):
+        red = filtrarNodos(red, set(definicion["excluir"]))
+    red["escenario"] = {"id": idEscenario, "nombre": definicion.get("nombre", idEscenario),
+                        "descripcion": definicion.get("descripcion", ""), "fuente": definicion.get("fuente", "")}
+    red["flujo"] = definicion.get("flujo", {})
+    red["transmisiones"] = definicion.get("transmisiones", [])
+    red["firmas"] = definicion.get("firmas", [])
+    return red
 
 
 def cargaPorNodo(red):
@@ -97,6 +169,17 @@ def cargaComoHexadecimal(red):
     for origen, destino, valor in red["demandas"]:
         paquetes[origen] += "%02X%02X%04X" % (origen, destino, int(round(valor)) % 65536)
     return [p for p in paquetes if p]
+
+
+def firmasDeEjemplo(transmisiones):
+    """Tres firmas de ejemplo tomadas de las propias transmisiones, para que la consola muestre coincidencias."""
+    firmas = []
+    if transmisiones:
+        firmas.append(transmisiones[0][16:24] or "DEADBEEF")
+    if len(transmisiones) > 1:
+        firmas.append(transmisiones[1][32:40] or "FF00FF")
+    firmas.append("DEADBEEF")
+    return firmas[:3]
 
 
 def construirEntradas(red, origen="uk1.uk", destino="gr1.gr"):

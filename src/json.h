@@ -2,7 +2,7 @@
  * Descripcion: lector y escritor minimo de JSON, sin librerias externas y sin excepciones
  * (el compilador del autograder corre en WebAssembly), para comunicar el ejecutable de
  * Sentinela del Norte por stdin y stdout. Los errores se reportan con valores de retorno.
- * Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
+ * Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena (A01385923), David Rangel Monsivais (A01385671)
  * Fecha: 21/10/2026
  */
 

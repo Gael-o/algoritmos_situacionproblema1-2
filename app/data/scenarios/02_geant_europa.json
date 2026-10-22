@@ -1,0 +1,10 @@
+{
+  "nombre": "GEANT solo Europa continental",
+  "descripcion": "La misma red sin Nueva York ni Israel, los dos nodos unidos por enlaces transoceanicos muy caros. Sirve para ver como cambian el MST y la ruta de mantenimiento cuando se quitan los saltos largos.",
+  "fuente": "SNDlib, red geant, filtrando ny1.ny e il1.il",
+  "nodos": "nodes.txt",
+  "enlaces": "links.txt",
+  "demandas": "demands.txt",
+  "excluir": ["ny1.ny", "il1.il"],
+  "flujo": {"origen": "pt1.pt", "destino": "se1.se"}
+}

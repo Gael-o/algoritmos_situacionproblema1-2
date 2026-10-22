@@ -2,7 +2,7 @@
  * Descripcion: problema del viajante (TSP): distancias minimas entre todos los pares
  * (Floyd-Warshall), solucion exacta (Held-Karp) para pocos nodos y aproximada
  * (vecino mas cercano + 2-opt) para instancias grandes, mas el adaptador JSON del modo "tsp".
- * Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
+ * Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena (A01385923), David Rangel Monsivais (A01385671)
  * Fecha: 21/10/2026
  */
 

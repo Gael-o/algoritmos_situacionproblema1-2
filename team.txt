@@ -3,11 +3,20 @@ Sentinela del Norte - TC2038 (Gpo 603)
 Integrantes, matriculas y contribuciones:
 
 1. Gael Alexander Zaragoza Torres - A01385956
-   Contribucion: MST (Prim y Kruskal), TSP, lector/escritor JSON, esqueleto del repositorio, README.
+   Contribucion: arquitectura del ejecutable (src/main.cpp y el protocolo JSON de entrada y salida),
+   lector y escritor de JSON sin dependencias (src/json.h), lectores compartidos (src/lectura.h,
+   src/grafo.h), MST con Kruskal y Prim (src/mst.h), TSP con Floyd-Warshall, Held-Karp, vecino mas
+   cercano y 2-opt (src/tsp.h), README y entrega.
 
-2. Damian Alejandro Gómez Mena - A01385923 
-   Contribucion: (flujo maximo y Voronoi, o cadenas y aplicacion; completar)
+2. Damian Alejandro Gomez Mena - A01385923
+   Contribucion: flujo maximo con Dinic y Edmonds-Karp (src/flujo.h), diagramas de Voronoi por recorte
+   de semiplanos y la variante ordenada, con la consulta del sitio mas cercano (src/voronoi.h),
+   pruebas de estres contra fuerza bruta (tests/estres.py) y verificacion de invariantes de flujo y area.
 
 3. David Rangel Monsivais - A01385671
-   Contribucion: (completar)
+   Contribucion: algoritmos de cadenas (src/cadenas.h): KMP y busqueda ingenua para firmas, Manacher y
+   expansion por centros para palindromos, y subcadena comun mas larga por hashing doble con busqueda
+   binaria y por programacion dinamica; aplicacion SENTINEL Digital Twin (app/server.py, app/static) y
+   el pipeline que convierte la red GEANT de SNDlib en entradas de los siete modos (app/geant.py).
+
 

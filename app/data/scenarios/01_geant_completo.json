@@ -1,0 +1,9 @@
+{
+  "nombre": "GEANT completo (SNDlib)",
+  "descripcion": "La red troncal europea tal como viene en SNDlib: 22 nodos, 36 enlaces y 462 demandas. Es el caso base de todo el proyecto.",
+  "fuente": "SNDlib, red geant, archivo geant.txt en formato nativo",
+  "nodos": "nodes.txt",
+  "enlaces": "links.txt",
+  "demandas": "demands.txt",
+  "flujo": {"origen": "uk1.uk", "destino": "gr1.gr"}
+}

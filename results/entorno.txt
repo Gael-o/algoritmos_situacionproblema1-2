@@ -1,0 +1,16 @@
+Entorno de la corrida de benchmarks
+
+Fecha: 21/10/2026 18:56
+Sistema: Linux 6.18.44-fc-v140 (x86_64)
+Procesador: x86_64
+Nucleos logicos: 2
+Python: 3.13.16
+Compilador: g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0
+Opciones de compilacion: -std=c++17 -O2 -Wall -Wextra -Wpedantic
+Repeticiones por medicion: 3 (mediana para el tiempo, maximo para la memoria)
+Semilla de generacion de instancias: 2026
+Medicion de memoria: VmHWM de /proc/<pid>/status (pico exacto del proceso hijo)
+
+Procedimiento:
+  g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic src/main.cpp -o sentinel
+  python3 tests/benchmark.py ./sentinel results/
