@@ -84,8 +84,7 @@ Resultados principales (equipo donde se corrieron: ver `results/README.md`):
 
 - [x] MST, TSP, flujo maximo, Voronoi, firmas, palindromo y subcadena comun
 - [x] Segunda tecnica y benchmarks por algoritmo
-- [x] Integracion con la red GEANT (parte 2): `app/geant.py` y datos en `app/data` (falta bajar `demands.txt`)
-- [x] Aplicacion web (`app/server.py`, ver `app/README.md`)
+   - [x] Integracion con la red GEANT (parte 2): `app/geant.py` y los datos reales en `app/data` (nodes, links y demands de SNDlib)- [x] Aplicacion web (`app/server.py`, ver `app/README.md`)
 - [ ] PDF de reflexion
 
 ## Pendiente de confirmar con el profesor
