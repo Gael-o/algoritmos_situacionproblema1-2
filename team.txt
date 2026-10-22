@@ -19,4 +19,3 @@ Integrantes, matriculas y contribuciones:
    binaria y por programacion dinamica; aplicacion SENTINEL Digital Twin (app/server.py, app/static) y
    el pipeline que convierte la red GEANT de SNDlib en entradas de los siete modos (app/geant.py).
 
-

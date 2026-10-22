@@ -2,6 +2,20 @@
 
 Siete algoritmos en C++ (MST, TSP, flujo maximo, Voronoi, firmas con KMP, palindromo mas largo y subcomun mas larga) que se comunican por JSON, y una aplicacion que los ejecuta sobre datos reales de la red GEANT (SNDlib).
 
+## Instalacion y dependencias
+
+El nucleo algoritmico **no tiene dependencias**: es C++17 estandar, sin bibliotecas externas y sin
+excepciones (el compilador WebAssembly del autograder no las soporta). Basta `g++` o `clang++` con C++17.
+
+| Para | Hace falta | Nota |
+|---|---|---|
+| Compilar y correr los siete algoritmos | `g++` con C++17 | Nada mas |
+| Correr las pruebas y los benchmarks | `python3` 3.8 o mas | Solo biblioteca estandar |
+| Medir memoria en Windows o macOS | `psutil` (`pip install psutil`) | En Linux no hace falta |
+| Levantar la aplicacion | `python3` y un navegador | Sin frameworks ni `npm` |
+
+No hay nada que instalar ni configurar: se clona el repositorio, se compila y se ejecuta.
+
 ## Compilacion
 
 Con las mismas opciones que usa el autograder (solo se compila `src/main.cpp`; los `.h` se incluyen):
@@ -106,9 +120,15 @@ memoria y se ve en los numeros, y una tecnica mas elaborada (Voronoi ordenado) p
 - [x] Casos de prueba cargables desde la aplicacion (`app/data/scenarios`)
 - [ ] PDF de reflexion
 
-## Pendiente de confirmar con el profesor
+## Limitacion conocida
 
-- Esquema exacto de salida del modo `matching` (nombre del campo, contenido de cada uno de los seis resultados y su orden).
+El modo `matching` no pasa los casos del autograder en linea, aunque el algoritmo es correcto: reproduce el
+ejemplo oficial de la pagina (ABBA en 13 y 11, FF en 11 y 9, DEAD ausente en las dos transmisiones) y coincide
+con fuerza bruta en miles de casos aleatorios, como comprueba `tests/estres.py`. Lo que no logramos acertar es
+el **esquema de salida** que espera el evaluador: probamos once combinaciones de orden de los seis resultados
+y de como marcar la firma ausente. La version entregada usa el formato que describe la pagina en "Formatos de
+salida": seis resultados, las tres firmas sobre la transmision 1 y luego sobre la 2, cada uno como
+`{"found": true, "position": p}` o `{"found": false}`. Queda como pregunta abierta para el profesor.
 
 ## Estandar de codificacion
 
