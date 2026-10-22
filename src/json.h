@@ -1,8 +1,9 @@
 /*
- * Descripcion: lector y escritor minimo de JSON, sin librerias externas, para
- * comunicar el ejecutable de Sentinela del Norte por stdin y stdout.
+ * Descripcion: lector y escritor minimo de JSON, sin librerias externas y sin excepciones
+ * (el compilador del autograder corre en WebAssembly), para comunicar el ejecutable de
+ * Sentinela del Norte por stdin y stdout. Los errores se reportan con valores de retorno.
  * Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
- * Fecha: 20/10/2026
+ * Fecha: 21/10/2026
  */
 
 #ifndef JSON_H
@@ -12,7 +13,6 @@
 #include <cstdlib>
 #include <iomanip>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -112,21 +112,51 @@ void agregarCampo(JsonValue& objeto, const std::string& clave, const JsonValue& 
 }
 
 /*
- * Busca un campo por nombre dentro de un objeto JSON.
+ * Busca un campo por nombre dentro de un objeto JSON y copia su valor.
  * Parametro objeto: valor donde se busca.
  * Parametro clave: nombre del campo.
- * Retorno: apuntador al valor o nullptr si no existe o no es objeto.
+ * Parametro resultado: recibe la copia del valor si se encuentra (si no, no se modifica).
+ * Retorno: true si el campo existe.
  */
-const JsonValue* buscarCampo(const JsonValue& objeto, const std::string& clave) {
-	const JsonValue* encontrado = nullptr;
+bool buscarCampo(const JsonValue& objeto, const std::string& clave, JsonValue& resultado) {
+	bool encontrado = false;
 	if (objeto.tipo == JsonTipo::OBJETO) {
 		for (size_t i = 0; i < objeto.claves.size(); i++) {
-			if (encontrado == nullptr && objeto.claves[i] == clave) {
-				encontrado = &objeto.valores[i];
+			if (!encontrado && objeto.claves[i] == clave) {
+				resultado = objeto.valores[i];
+				encontrado = true;
 			}
 		}
 	}
 	return encontrado;
+}
+
+/*
+ * Lista los nombres de campo de un objeto, para mensajes de diagnostico.
+ * Parametro valor: valor a inspeccionar.
+ * Retorno: nombres separados por coma, o un aviso si el valor no es un objeto.
+ */
+std::string listarClaves(const JsonValue& valor) {
+	std::string resultado = "(no es un objeto)";
+	if (valor.tipo == JsonTipo::OBJETO) {
+		resultado = "";
+		for (size_t i = 0; i < valor.claves.size(); i++) {
+			resultado += i > 0 ? ", " : "";
+			resultado += valor.claves[i];
+		}
+	}
+	return resultado;
+}
+
+/*
+ * Construye una respuesta de error con el mensaje dado.
+ * Parametro mensaje: descripcion del error.
+ * Retorno: objeto JSON con el campo error.
+ */
+JsonValue construirError(const std::string& mensaje) {
+	JsonValue respuesta = crearObjeto();
+	agregarCampo(respuesta, "error", crearTexto(mensaje));
+	return respuesta;
 }
 
 /*
@@ -222,6 +252,19 @@ class JsonParser {
 private:
 	std::string contenido;
 	size_t posicion = 0;
+	bool hayError = false;
+	std::string mensajeError = "";
+
+	/*
+	 * Registra el primer error encontrado; los siguientes se ignoran.
+	 * Parametro mensaje: descripcion del error.
+	 */
+	void registrarError(const std::string& mensaje) {
+		if (!hayError) {
+			hayError = true;
+			mensajeError = mensaje;
+		}
+	}
 
 	/*
 	 * Indica si un caracter es espacio en blanco JSON.
@@ -255,12 +298,12 @@ private:
 	}
 
 	/*
-	 * Exige que el caracter actual sea el esperado y lo consume.
+	 * Exige que el caracter actual sea el esperado y lo consume; si no, registra el error.
 	 * Parametro esperado: caracter obligatorio.
 	 */
 	void esperar(char esperado) {
 		if (!consumirSiEs(esperado)) {
-			throw std::runtime_error(std::string("JSON invalido: se esperaba '") + esperado + "'");
+			registrarError(std::string("JSON invalido: se esperaba '") + esperado + "'");
 		}
 	}
 
@@ -282,24 +325,25 @@ private:
 	 * Retorno: texto UTF-8 del caracter (solo plano basico).
 	 */
 	std::string leerUnicode() {
-		if (posicion + 4 > contenido.size()) {
-			throw std::runtime_error("JSON invalido: secuencia unicode incompleta");
-		}
-		unsigned long codigo = std::strtoul(contenido.substr(posicion, 4).c_str(), nullptr, 16);
-		posicion += 4;
-		unsigned long parteAlta = codigo >> 12;
-		unsigned long parteMedia = codigo >> 6;
-		unsigned long parteBaja = codigo & 0x3F;
 		std::string resultado = "";
-		if (codigo < 0x80) {
-			resultado += static_cast<char>(codigo);
-		} else if (codigo < 0x800) {
-			resultado += static_cast<char>(0xC0 | parteMedia);
-			resultado += static_cast<char>(0x80 | parteBaja);
+		if (posicion + 4 > contenido.size()) {
+			registrarError("JSON invalido: secuencia unicode incompleta");
 		} else {
-			resultado += static_cast<char>(0xE0 | parteAlta);
-			resultado += static_cast<char>(0x80 | (parteMedia & 0x3F));
-			resultado += static_cast<char>(0x80 | parteBaja);
+			unsigned long codigo = std::strtoul(contenido.substr(posicion, 4).c_str(), nullptr, 16);
+			posicion += 4;
+			unsigned long parteAlta = codigo >> 12;
+			unsigned long parteMedia = codigo >> 6;
+			unsigned long parteBaja = codigo & 0x3F;
+			if (codigo < 0x80) {
+				resultado += static_cast<char>(codigo);
+			} else if (codigo < 0x800) {
+				resultado += static_cast<char>(0xC0 | parteMedia);
+				resultado += static_cast<char>(0x80 | parteBaja);
+			} else {
+				resultado += static_cast<char>(0xE0 | parteAlta);
+				resultado += static_cast<char>(0x80 | (parteMedia & 0x3F));
+				resultado += static_cast<char>(0x80 | parteBaja);
+			}
 		}
 		return resultado;
 	}
@@ -309,24 +353,26 @@ private:
 	 * Retorno: texto que representa el escape.
 	 */
 	std::string leerEscape() {
+		std::string resultado = "";
 		if (posicion >= contenido.size()) {
-			throw std::runtime_error("JSON invalido: escape incompleto");
-		}
-		char marca = contenido[posicion];
-		posicion++;
-		std::string resultado = std::string(1, marca);
-		if (marca == 'n') {
-			resultado = "\n";
-		} else if (marca == 't') {
-			resultado = "\t";
-		} else if (marca == 'r') {
-			resultado = "\r";
-		} else if (marca == 'b') {
-			resultado = "\b";
-		} else if (marca == 'f') {
-			resultado = "\f";
-		} else if (marca == 'u') {
-			resultado = leerUnicode();
+			registrarError("JSON invalido: escape incompleto");
+		} else {
+			char marca = contenido[posicion];
+			posicion++;
+			resultado = std::string(1, marca);
+			if (marca == 'n') {
+				resultado = "\n";
+			} else if (marca == 't') {
+				resultado = "\t";
+			} else if (marca == 'r') {
+				resultado = "\r";
+			} else if (marca == 'b') {
+				resultado = "\b";
+			} else if (marca == 'f') {
+				resultado = "\f";
+			} else if (marca == 'u') {
+				resultado = leerUnicode();
+			}
 		}
 		return resultado;
 	}
@@ -339,18 +385,19 @@ private:
 		esperar('"');
 		std::string resultado = "";
 		bool cerrado = false;
-		while (!cerrado) {
+		while (!cerrado && !hayError) {
 			if (posicion >= contenido.size()) {
-				throw std::runtime_error("JSON invalido: texto sin cerrar");
-			}
-			char actual = contenido[posicion];
-			posicion++;
-			if (actual == '"') {
-				cerrado = true;
-			} else if (actual == '\\') {
-				resultado += leerEscape();
+				registrarError("JSON invalido: texto sin cerrar");
 			} else {
-				resultado += actual;
+				char actual = contenido[posicion];
+				posicion++;
+				if (actual == '"') {
+					cerrado = true;
+				} else if (actual == '\\') {
+					resultado += leerEscape();
+				} else {
+					resultado += actual;
+				}
 			}
 		}
 		return resultado;
@@ -361,13 +408,14 @@ private:
 	 * Retorno: valor numerico leido.
 	 */
 	double parsearNumero() {
-		const char* inicio = contenido.c_str() + posicion;
+		char* inicio = &contenido[posicion];
 		char* fin = nullptr;
 		double valor = std::strtod(inicio, &fin);
 		if (fin == inicio) {
-			throw std::runtime_error("JSON invalido: valor no reconocido");
+			registrarError("JSON invalido: valor no reconocido");
+		} else {
+			posicion += static_cast<size_t>(fin - inicio);
 		}
-		posicion += static_cast<size_t>(fin - inicio);
 		return valor;
 	}
 
@@ -379,9 +427,9 @@ private:
 		JsonValue resultado = crearArreglo();
 		esperar('[');
 		saltarEspacios();
-		if (!consumirSiEs(']')) {
+		if (!hayError && !consumirSiEs(']')) {
 			bool continuar = true;
-			while (continuar) {
+			while (continuar && !hayError) {
 				agregarElemento(resultado, parsearValor());
 				saltarEspacios();
 				continuar = consumirSiEs(',');
@@ -399,9 +447,9 @@ private:
 		JsonValue resultado = crearObjeto();
 		esperar('{');
 		saltarEspacios();
-		if (!consumirSiEs('}')) {
+		if (!hayError && !consumirSiEs('}')) {
 			bool continuar = true;
-			while (continuar) {
+			while (continuar && !hayError) {
 				saltarEspacios();
 				std::string clave = parsearTexto();
 				saltarEspacios();
@@ -417,29 +465,30 @@ private:
 
 	/*
 	 * Lee cualquier valor JSON a partir de la posicion actual.
-	 * Retorno: valor leido.
+	 * Retorno: valor leido (NULO si hubo un error).
 	 */
 	JsonValue parsearValor() {
+		JsonValue resultado;
 		saltarEspacios();
 		if (posicion >= contenido.size()) {
-			throw std::runtime_error("JSON invalido: fin de entrada inesperado");
-		}
-		char actual = contenido[posicion];
-		JsonValue resultado;
-		if (actual == '{') {
-			resultado = parsearObjeto();
-		} else if (actual == '[') {
-			resultado = parsearArreglo();
-		} else if (actual == '"') {
-			resultado = crearTexto(parsearTexto());
-		} else if (coincideLiteral("true")) {
-			resultado = crearBooleano(true);
-		} else if (coincideLiteral("false")) {
-			resultado = crearBooleano(false);
-		} else if (coincideLiteral("null")) {
-			resultado = JsonValue();
+			registrarError("JSON invalido: fin de entrada inesperado");
 		} else {
-			resultado = crearNumero(parsearNumero());
+			char actual = contenido[posicion];
+			if (actual == '{') {
+				resultado = parsearObjeto();
+			} else if (actual == '[') {
+				resultado = parsearArreglo();
+			} else if (actual == '"') {
+				resultado = crearTexto(parsearTexto());
+			} else if (coincideLiteral("true")) {
+				resultado = crearBooleano(true);
+			} else if (coincideLiteral("false")) {
+				resultado = crearBooleano(false);
+			} else if (coincideLiteral("null")) {
+				resultado = JsonValue();
+			} else {
+				resultado = crearNumero(parsearNumero());
+			}
 		}
 		return resultado;
 	}
@@ -454,15 +503,18 @@ public:
 
 	/*
 	 * Lee el documento completo y verifica que no sobre contenido.
-	 * Retorno: valor raiz del documento.
+	 * Parametro resultado: recibe el valor raiz del documento.
+	 * Parametro mensaje: recibe la descripcion del error si el documento es invalido.
+	 * Retorno: true si el documento es JSON valido.
 	 */
-	JsonValue parsear() {
-		JsonValue resultado = parsearValor();
+	bool parsear(JsonValue& resultado, std::string& mensaje) {
+		resultado = parsearValor();
 		saltarEspacios();
-		if (posicion != contenido.size()) {
-			throw std::runtime_error("JSON invalido: contenido sobrante despues del valor");
+		if (!hayError && posicion != contenido.size()) {
+			registrarError("JSON invalido: contenido sobrante despues del valor");
 		}
-		return resultado;
+		mensaje = mensajeError;
+		return !hayError;
 	}
 };
 

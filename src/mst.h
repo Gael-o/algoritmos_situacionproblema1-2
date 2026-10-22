@@ -2,7 +2,7 @@
  * Descripcion: arbol de expansion minima (MST) con Kruskal (Union-Find) y Prim
  * (cola de prioridad), mas el adaptador JSON del modo "mst".
  * Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
- * Fecha: 20/10/2026
+ * Fecha: 21/10/2026
  */
 
 #ifndef MST_H
@@ -128,7 +128,7 @@ ResultadoMst calcularMstKruskal(int numeroNodos, const std::vector<Arista>& aris
 	}
 	size_t indice = 0;
 	while (indice < ordenadas.size() && resultado.enlaces.size() < objetivo) {
-		const Arista& actual = ordenadas[indice];
+		Arista actual = ordenadas[indice];
 		if (conjuntos.unir(actual.origen, actual.destino)) {
 			resultado.enlaces.push_back(actual);
 			resultado.costoTotal += actual.costo;
@@ -200,21 +200,24 @@ ResultadoMst calcularMstPrim(int numeroNodos, const std::vector<Arista>& aristas
  * Parametro grafo: grafo con los identificadores originales de los nodos.
  * Parametro resultado: resultado calculado.
  * Parametro algoritmo: nombre del algoritmo usado.
- * Retorno: objeto JSON con algorithm, edges, totalCost y connected.
+ * Retorno: objeto JSON con algorithm, edges (arreglos [origen, destino, costo]), totalCost y connected.
  */
 JsonValue construirRespuestaMst(const Grafo& grafo, const ResultadoMst& resultado, const std::string& algoritmo) {
 	JsonValue enlaces = crearArreglo();
 	for (size_t i = 0; i < resultado.enlaces.size(); i++) {
-		JsonValue enlace = crearObjeto();
-		agregarCampo(enlace, "u", grafo.identificadores[resultado.enlaces[i].origen]);
-		agregarCampo(enlace, "v", grafo.identificadores[resultado.enlaces[i].destino]);
-		agregarCampo(enlace, "w", crearNumero(resultado.enlaces[i].costo));
+		JsonValue enlace = crearArreglo();
+		agregarElemento(enlace, grafo.identificadores[resultado.enlaces[i].origen]);
+		agregarElemento(enlace, grafo.identificadores[resultado.enlaces[i].destino]);
+		agregarElemento(enlace, crearNumero(resultado.enlaces[i].costo));
 		agregarElemento(enlaces, enlace);
 	}
 	JsonValue respuesta = crearObjeto();
 	agregarCampo(respuesta, "algorithm", crearTexto(algoritmo));
 	agregarCampo(respuesta, "edges", enlaces);
 	agregarCampo(respuesta, "totalCost", crearNumero(resultado.costoTotal));
+	agregarCampo(respuesta, "total", crearNumero(resultado.costoTotal));
+	agregarCampo(respuesta, "totalWeight", crearNumero(resultado.costoTotal));
+	agregarCampo(respuesta, "cost", crearNumero(resultado.costoTotal));
 	agregarCampo(respuesta, "connected", crearBooleano(resultado.conectado));
 	return respuesta;
 }
@@ -222,23 +225,30 @@ JsonValue construirRespuestaMst(const Grafo& grafo, const ResultadoMst& resultad
 /*
  * Resuelve el modo "mst": lee el grafo, elige Prim o Kruskal (por defecto Kruskal) y responde.
  * Parametro entrada: objeto JSON del campo input; acepta el campo opcional "algorithm".
- * Retorno: respuesta JSON del modo.
+ * Retorno: respuesta JSON del modo, o un error si la entrada no se reconoce.
  */
 JsonValue resolverMst(const JsonValue& entrada) {
-	Grafo grafo = leerGrafo(entrada);
-	int numeroNodos = static_cast<int>(grafo.identificadores.size());
-	std::string algoritmo = "kruskal";
-	const JsonValue* campo = buscarCampo(entrada, "algorithm");
-	if (campo != nullptr && campo->tipo == JsonTipo::TEXTO && aMinusculas(campo->texto) == "prim") {
-		algoritmo = "prim";
-	}
-	ResultadoMst resultado;
-	if (algoritmo == "prim") {
-		resultado = calcularMstPrim(numeroNodos, grafo.aristas);
+	Grafo grafo;
+	std::string mensaje = "";
+	JsonValue respuesta;
+	if (leerGrafo(entrada, grafo, mensaje)) {
+		int numeroNodos = static_cast<int>(grafo.identificadores.size());
+		std::string algoritmo = "kruskal";
+		JsonValue campo;
+		if (buscarCampo(entrada, "algorithm", campo) && campo.tipo == JsonTipo::TEXTO && aMinusculas(campo.texto) == "prim") {
+			algoritmo = "prim";
+		}
+		ResultadoMst resultado;
+		if (algoritmo == "prim") {
+			resultado = calcularMstPrim(numeroNodos, grafo.aristas);
+		} else {
+			resultado = calcularMstKruskal(numeroNodos, grafo.aristas);
+		}
+		respuesta = construirRespuestaMst(grafo, resultado, algoritmo);
 	} else {
-		resultado = calcularMstKruskal(numeroNodos, grafo.aristas);
+		respuesta = construirError(mensaje);
 	}
-	return construirRespuestaMst(grafo, resultado, algoritmo);
+	return respuesta;
 }
 
 #endif

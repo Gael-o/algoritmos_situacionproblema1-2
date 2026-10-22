@@ -3,24 +3,23 @@
  * compartido por MST, TSP y flujo maximo. Los nombres de campo aceptados son
  * supuestos que deben ajustarse cuando se conozca el esquema oficial del autograder.
  * Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
- * Fecha: 20/10/2026
+ * Fecha: 21/10/2026
  */
 
 #ifndef GRAFO_H
 #define GRAFO_H
 
 #include <map>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "json.h"
 
 const std::vector<std::string> CLAVES_ARISTAS = {"edges", "links", "aristas", "enlaces"};
-const std::vector<std::string> CLAVES_NODOS = {"nodes", "nodos", "vertices"};
+const std::vector<std::string> CLAVES_NODOS = {"nodes", "nodos", "vertices", "n", "N", "numNodes", "nodeCount", "num_nodes", "node_count"};
 const std::vector<std::string> CLAVES_ORIGEN = {"u", "from", "source", "origen", "src", "a"};
 const std::vector<std::string> CLAVES_DESTINO = {"v", "to", "target", "destino", "dst", "b"};
-const std::vector<std::string> CLAVES_COSTO = {"w", "weight", "cost", "costo", "distance", "distancia"};
+const std::vector<std::string> CLAVES_COSTO = {"w", "weight", "cost", "costo", "distance", "distancia", "capacity", "cap", "capacidad", "c"};
 const std::vector<std::string> CLAVES_IDENTIFICADOR = {"id", "name", "nombre"};
 
 struct Arista {
@@ -38,54 +37,44 @@ struct Grafo {
  * Busca en un objeto el primer campo cuyo nombre aparezca en la lista dada.
  * Parametro objeto: valor donde se busca.
  * Parametro nombres: nombres alternativos del campo, en orden de preferencia.
- * Retorno: apuntador al valor o nullptr si ninguno existe.
+ * Parametro resultado: recibe la copia del valor encontrado.
+ * Retorno: true si alguno de los nombres existe.
  */
-const JsonValue* buscarPrimerCampo(const JsonValue& objeto, const std::vector<std::string>& nombres) {
-	const JsonValue* encontrado = nullptr;
+bool buscarPrimerCampo(const JsonValue& objeto, const std::vector<std::string>& nombres, JsonValue& resultado) {
+	bool encontrado = false;
 	for (size_t i = 0; i < nombres.size(); i++) {
-		if (encontrado == nullptr) {
-			encontrado = buscarCampo(objeto, nombres[i]);
+		if (!encontrado) {
+			encontrado = buscarCampo(objeto, nombres[i], resultado);
 		}
 	}
 	return encontrado;
 }
 
 /*
- * Convierte el identificador de un nodo (numero o texto) en una llave de texto.
- * Parametro identificador: valor JSON que identifica al nodo.
- * Retorno: llave de texto unica para ese identificador.
- */
-std::string identificadorATexto(const JsonValue& identificador) {
-	std::string clave = "";
-	if (identificador.tipo == JsonTipo::TEXTO) {
-		clave = identificador.texto;
-	} else if (identificador.tipo == JsonTipo::NUMERO) {
-		clave = formatearNumero(identificador.numero);
-	} else {
-		throw std::runtime_error("identificador de nodo invalido: debe ser numero o texto");
-	}
-	return clave;
-}
-
-/*
  * Obtiene el indice interno de un nodo, registrandolo si es la primera vez que aparece.
  * Parametro grafo: grafo donde se guardan los identificadores originales.
  * Parametro indices: tabla de identificador a indice interno.
- * Parametro identificador: valor JSON original del nodo.
- * Retorno: indice interno del nodo (0 a n-1).
+ * Parametro identificador: valor JSON original del nodo (numero o texto).
+ * Parametro indice: recibe el indice interno del nodo (0 a n-1).
+ * Retorno: false si el identificador no es numero ni texto.
  */
-int registrarNodo(Grafo& grafo, std::map<std::string, int>& indices, const JsonValue& identificador) {
-	std::string clave = identificadorATexto(identificador);
-	std::map<std::string, int>::iterator encontrado = indices.find(clave);
-	int indice = 0;
-	if (encontrado == indices.end()) {
-		indice = static_cast<int>(grafo.identificadores.size());
-		indices[clave] = indice;
-		grafo.identificadores.push_back(identificador);
-	} else {
-		indice = encontrado->second;
+bool registrarNodo(Grafo& grafo, std::map<std::string, int>& indices, const JsonValue& identificador, int& indice) {
+	bool valido = identificador.tipo == JsonTipo::TEXTO || identificador.tipo == JsonTipo::NUMERO;
+	if (valido) {
+		std::string clave = identificador.texto;
+		if (identificador.tipo == JsonTipo::NUMERO) {
+			clave = formatearNumero(identificador.numero);
+		}
+		std::map<std::string, int>::iterator encontrado = indices.find(clave);
+		if (encontrado == indices.end()) {
+			indice = static_cast<int>(grafo.identificadores.size());
+			indices[clave] = indice;
+			grafo.identificadores.push_back(identificador);
+		} else {
+			indice = encontrado->second;
+		}
 	}
-	return indice;
+	return valido;
 }
 
 /*
@@ -93,74 +82,92 @@ int registrarNodo(Grafo& grafo, std::map<std::string, int>& indices, const JsonV
  * Parametro elemento: valor JSON de la arista.
  * Parametro grafo: grafo al que se agrega.
  * Parametro indices: tabla de identificador a indice interno.
+ * Parametro mensaje: recibe la descripcion del problema si la arista no se reconoce.
+ * Retorno: true si la arista se leyo correctamente.
  */
-void leerArista(const JsonValue& elemento, Grafo& grafo, std::map<std::string, int>& indices) {
-	const JsonValue* origen = nullptr;
-	const JsonValue* destino = nullptr;
-	const JsonValue* costo = nullptr;
+bool leerArista(const JsonValue& elemento, Grafo& grafo, std::map<std::string, int>& indices, std::string& mensaje) {
+	JsonValue origen;
+	JsonValue destino;
+	JsonValue costo;
+	bool tieneOrigen = false;
+	bool tieneDestino = false;
+	bool tieneCosto = false;
 	if (elemento.tipo == JsonTipo::ARREGLO && elemento.arreglo.size() >= 2) {
-		origen = &elemento.arreglo[0];
-		destino = &elemento.arreglo[1];
+		origen = elemento.arreglo[0];
+		destino = elemento.arreglo[1];
+		tieneOrigen = true;
+		tieneDestino = true;
 		if (elemento.arreglo.size() >= 3) {
-			costo = &elemento.arreglo[2];
+			costo = elemento.arreglo[2];
+			tieneCosto = true;
 		}
 	} else if (elemento.tipo == JsonTipo::OBJETO) {
-		origen = buscarPrimerCampo(elemento, CLAVES_ORIGEN);
-		destino = buscarPrimerCampo(elemento, CLAVES_DESTINO);
-		costo = buscarPrimerCampo(elemento, CLAVES_COSTO);
+		tieneOrigen = buscarPrimerCampo(elemento, CLAVES_ORIGEN, origen);
+		tieneDestino = buscarPrimerCampo(elemento, CLAVES_DESTINO, destino);
+		tieneCosto = buscarPrimerCampo(elemento, CLAVES_COSTO, costo);
 	}
-	if (origen == nullptr || destino == nullptr) {
-		throw std::runtime_error("arista invalida: faltan el origen o el destino");
-	}
-	Arista arista;
-	arista.origen = registrarNodo(grafo, indices, *origen);
-	arista.destino = registrarNodo(grafo, indices, *destino);
-	arista.costo = 1.0;
-	if (costo != nullptr && costo->tipo == JsonTipo::NUMERO) {
-		arista.costo = costo->numero;
-	}
-	grafo.aristas.push_back(arista);
-}
-
-/*
- * Extrae el identificador de un elemento de la lista de nodos (valor simple u objeto con id).
- * Parametro nodo: elemento de la lista de nodos.
- * Retorno: valor JSON que identifica al nodo.
- */
-JsonValue extraerIdentificador(const JsonValue& nodo) {
-	JsonValue identificador = nodo;
-	if (nodo.tipo == JsonTipo::OBJETO) {
-		const JsonValue* campo = buscarPrimerCampo(nodo, CLAVES_IDENTIFICADOR);
-		if (campo == nullptr) {
-			throw std::runtime_error("nodo invalido: falta el campo id");
+	bool correcto = tieneOrigen && tieneDestino;
+	if (!correcto) {
+		mensaje = "arista no reconocida, campos recibidos: " + listarClaves(elemento);
+	} else {
+		Arista arista;
+		arista.costo = 1.0;
+		correcto = registrarNodo(grafo, indices, origen, arista.origen) && registrarNodo(grafo, indices, destino, arista.destino);
+		if (!correcto) {
+			mensaje = "identificador de nodo invalido: debe ser numero o texto";
+		} else {
+			if (tieneCosto && costo.tipo == JsonTipo::NUMERO) {
+				arista.costo = costo.numero;
+			}
+			grafo.aristas.push_back(arista);
 		}
-		identificador = *campo;
 	}
-	return identificador;
+	return correcto;
 }
 
 /*
  * Construye un grafo a partir de la entrada JSON de un modo.
  * Parametro entrada: objeto con la lista de aristas y, opcionalmente, la lista de nodos.
- * Retorno: grafo con identificadores originales y aristas indexadas de 0 a n-1.
+ * Parametro grafo: recibe identificadores originales y aristas indexadas de 0 a n-1.
+ * Parametro mensaje: recibe la descripcion del problema si la entrada no se reconoce.
+ * Retorno: true si la entrada se leyo correctamente.
  */
-Grafo leerGrafo(const JsonValue& entrada) {
-	Grafo grafo;
+bool leerGrafo(const JsonValue& entrada, Grafo& grafo, std::string& mensaje) {
 	std::map<std::string, int> indices;
-	const JsonValue* nodos = buscarPrimerCampo(entrada, CLAVES_NODOS);
-	if (nodos != nullptr && nodos->tipo == JsonTipo::ARREGLO) {
-		for (size_t i = 0; i < nodos->arreglo.size(); i++) {
-			registrarNodo(grafo, indices, extraerIdentificador(nodos->arreglo[i]));
+	bool correcto = true;
+	JsonValue nodos;
+	bool hayNodos = buscarPrimerCampo(entrada, CLAVES_NODOS, nodos);
+	if (hayNodos && nodos.tipo == JsonTipo::NUMERO && nodos.numero >= 0 && nodos.numero < 100000000) {
+		int cantidad = static_cast<int>(nodos.numero);
+		for (int i = 0; i < cantidad; i++) {
+			int indice = 0;
+			registrarNodo(grafo, indices, crearNumero(static_cast<double>(i)), indice);
 		}
 	}
-	const JsonValue* aristas = buscarPrimerCampo(entrada, CLAVES_ARISTAS);
-	if (aristas == nullptr || aristas->tipo != JsonTipo::ARREGLO) {
-		throw std::runtime_error("la entrada no trae la lista de aristas (edges)");
+	if (hayNodos && nodos.tipo == JsonTipo::ARREGLO) {
+		for (size_t i = 0; i < nodos.arreglo.size() && correcto; i++) {
+			JsonValue identificador = nodos.arreglo[i];
+			int indice = 0;
+			if (nodos.arreglo[i].tipo == JsonTipo::OBJETO) {
+				correcto = buscarPrimerCampo(nodos.arreglo[i], CLAVES_IDENTIFICADOR, identificador);
+			}
+			correcto = correcto && registrarNodo(grafo, indices, identificador, indice);
+			if (!correcto) {
+				mensaje = "nodo no reconocido, debe ser numero, texto u objeto con id";
+			}
+		}
 	}
-	for (size_t i = 0; i < aristas->arreglo.size(); i++) {
-		leerArista(aristas->arreglo[i], grafo, indices);
+	JsonValue aristas;
+	if (correcto) {
+		correcto = buscarPrimerCampo(entrada, CLAVES_ARISTAS, aristas) && aristas.tipo == JsonTipo::ARREGLO;
+		if (!correcto) {
+			mensaje = "la entrada no trae la lista de aristas, campos recibidos: " + listarClaves(entrada);
+		}
 	}
-	return grafo;
+	for (size_t i = 0; i < aristas.arreglo.size() && correcto; i++) {
+		correcto = leerArista(aristas.arreglo[i], grafo, indices, mensaje);
+	}
+	return correcto;
 }
 
 #endif

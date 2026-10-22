@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SENTINEL Digital Twin</title>
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--ink:#16202a;--mute:#5b6773;--line:#d7dce2;--acc:#0b6bcb;--ok:#1a8a4a;--bad:#c0392b;--mst:#1a8a4a;--route:#d97706;--cell:#0b6bcb}
+@media (prefers-color-scheme:dark){:root{--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--mute:#9aa7b4;--line:#2a3541;--acc:#5aa9ff;--ok:#4cc27f;--bad:#ff6b5e;--mst:#4cc27f;--route:#f5a524;--cell:#5aa9ff}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
+header{padding:14px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
+header h1{margin:0;font-size:18px}header p{margin:2px 0 0;color:var(--mute);font-size:13px}
+nav{display:flex;gap:6px;padding:10px 16px;flex-wrap:wrap}
+nav button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px;border-radius:8px;cursor:pointer;font:inherit}
+nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+main{padding:0 16px 24px;display:grid;gap:14px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
+h2{margin:0 0 8px;font-size:16px}
+label{display:block;font-size:13px;color:var(--mute);margin:8px 0 3px}
+select,textarea,input{width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+textarea{font-family:ui-monospace,Consolas,monospace;font-size:13px;min-height:70px}
+button.run{margin-top:10px;background:var(--acc);color:#fff;border:0;padding:9px 14px;border-radius:8px;cursor:pointer;font:inherit}
+button.alt{background:transparent;color:var(--acc);border:1px solid var(--acc);margin-left:6px}
+svg{width:100%;height:auto;background:var(--bg);border-radius:8px;border:1px solid var(--line)}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;max-height:240px;font-size:12px;margin:8px 0 0}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line);color:var(--mute)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}mark{background:#f5a52455;color:inherit;padding:0 1px}
+.seq{font-family:ui-monospace,Consolas,monospace;font-size:13px;word-break:break-all}
+.hide{display:none}.note{color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<header><h1>SENTINEL Digital Twin &mdash; red GÉANT</h1><p>Todos los cálculos los hace el programa en C++ (<code>./sentinel</code>); esta página solo arma la entrada y dibuja la salida.</p></header>
+<nav id="tabs"></nav>
+<main>
+<div>
+ <section><h2 id="mapTitle">Mapa</h2>
+  <svg id="map" viewBox="0 0 700 520" role="img" aria-label="Mapa de la red GÉANT"></svg>
+  <p class="note" id="mapNote"></p>
+  <label><input type="checkbox" id="showNY" style="width:auto"> Mostrar Nueva York (ny1)</label>
+ </section>
+</div>
+<div id="side"></div>
+</main>
+<script>
+"use strict";
+const TABS = ["Network Explorer","Algorithm Lab","Cybersecurity Console","Scenario Manager"];
+let net = null, overlay = {}, tab = 0, cut = null;
+
+const SVG_TAGS=["line","circle","polygon","polyline","text"];
+function el(tag, attrs, text){const e=SVG_TAGS.includes(tag)?document.createElementNS("http://www.w3.org/2000/svg",tag):document.createElement(tag);for(const k in (attrs||{}))e.setAttribute(k,attrs[k]);if(text!==undefined)e.textContent=text;return e}
+async function run(mode, input){const t=performance.now();const r=await fetch("/api/run",{method:"POST",body:JSON.stringify({mode,input})});const j=await r.json();return {out:j,ms:performance.now()-t}}
+
+function inputs(skipLink){
+ const links = net.links.filter((l,i)=>i!==skipLink);
+ const edges = links.map(l=>[l.u,l.v,l.cost]);
+ const flow = []; links.forEach(l=>{flow.push([l.u,l.v,l.capacity]);flow.push([l.v,l.u,l.capacity])});
+ return {edges, flow};
+}
+function project(n){const lat0=50*Math.PI/180;const ny=document.getElementById("showNY").checked;
+ const lons=net.nodes.filter(x=>ny||x.name!=="ny1.ny").map(x=>x.lon),lats=net.nodes.map(x=>x.lat);
+ const minX=Math.min(...lons),maxX=Math.max(...lons),minY=Math.min(...lats),maxY=Math.max(...lats);
+ const k=Math.min(640/((maxX-minX)*Math.cos(lat0)),480/(maxY-minY));
+ return [30+(n.lon-minX)*Math.cos(lat0)*k, 20+(maxY-n.lat)*k]}
+function drawMap(){
+ const svg=document.getElementById("map");svg.textContent="";
+ const P=net.nodes.map(project);
+ (overlay.cells||[]).forEach(c=>{const pts=c.map(p=>project({lon:p[0],lat:p[1]})).map(p=>p.join(",")).join(" ");svg.appendChild(el("polygon",{points:pts,fill:"var(--cell)","fill-opacity":".10",stroke:"var(--cell)","stroke-width":"1"}))});
+ net.links.forEach((l,i)=>{const a=P[l.u],b=P[l.v];const mst=(overlay.mst||[]).some(e=>(e[0]==l.u&&e[1]==l.v)||(e[0]==l.v&&e[1]==l.u));
+  const isCut=cut===i;
+  svg.appendChild(el("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:isCut?"var(--bad)":(mst?"var(--mst)":"var(--line)"),"stroke-width":isCut?3:(mst?3:1.5),"stroke-dasharray":isCut?"6 4":""}))});
+ if(overlay.route){const pts=overlay.route.map(i=>P[i].join(",")).join(" ");svg.appendChild(el("polyline",{points:pts,fill:"none",stroke:"var(--route)","stroke-width":2.5,"stroke-linejoin":"round"}))}
+ net.nodes.forEach((n,i)=>{const hi=(overlay.mark||[]).includes(i);
+  svg.appendChild(el("circle",{cx:P[i][0],cy:P[i][1],r:hi?7:5,fill:hi?"var(--route)":"var(--acc)"}));
+  svg.appendChild(el("text",{x:P[i][0]+8,y:P[i][1]-6,"font-size":"11",fill:"var(--ink)"},n.name.split(".")[0]))});
+ document.getElementById("mapNote").textContent=overlay.note||"";
+}
+
+function renderTabs(){const nav=document.getElementById("tabs");nav.textContent="";TABS.forEach((t,i)=>{const b=el("button",{class:i===tab?"on":""},t);b.onclick=()=>{tab=i;overlay={};cut=null;renderTabs();render()};nav.appendChild(b)})}
+function nodeSelect(id,def){const s=el("select",{id});net.nodes.forEach((n,i)=>{const o=el("option",{value:i},n.name);if(n.name===def)o.selected=true;s.appendChild(o)});return s}
+function field(side,label,node){side.appendChild(el("label",{},label));side.appendChild(node)}
+function result(side){const r=el("div",{id:"res"});side.appendChild(r);return r}
+function showJSON(box,title,obj,ms){box.textContent="";box.appendChild(el("p",{},title+(ms?"  ("+ms.toFixed(1)+" ms, incluye ida y vuelta al programa)":"")));box.appendChild(el("pre",{},JSON.stringify(obj,null,1).slice(0,4000)))}
+
+function renderExplorer(side){
+ const s=el("section");s.appendChild(el("h2",{},"Network Explorer"));
+ s.appendChild(el("p",{},net.nodes.length+" nodos, "+net.links.length+" enlaces, "+net.demands+" demandas cargadas."));
+ if(net.demands===0)s.appendChild(el("p",{class:"note bad"},"Falta app/data/demands.txt (matriz de tráfico de SNDlib). Sin ella no hay carga por nodo ni consola de ciberseguridad."));
+ const t=el("table");t.appendChild(el("tr")).append(el("th",{},"Nodo"),el("th",{},"Tráfico (Mbit/s)"));
+ [...net.nodes].sort((a,b)=>b.load-a.load).slice(0,10).forEach(n=>{const r=el("tr");r.append(el("td",{},n.name),el("td",{},n.load.toFixed(0)));t.appendChild(r)});
+ s.appendChild(el("h2",{},"Top 10 por tráfico"));s.appendChild(t);side.appendChild(s);
+ overlay={note:"Cada punto es un nodo de la red; las líneas son enlaces de 40 Gbit/s."};
+}
+
+const TECH={mst:["","prim"],tsp:["","heldkarp","2opt","nn"],maxflow:["","edmondskarp"],voronoi:["","sorted"]};
+function renderLab(side){
+ const s=el("section");s.appendChild(el("h2",{},"Algorithm Laboratory"));
+ const mode=el("select",{id:"mode"});[["mst","MST (Kruskal / Prim)"],["tsp","TSP (ruta de mantenimiento)"],["maxflow","Flujo máximo (Dinic / Edmonds-Karp)"],["voronoi","Voronoi (cobertura)"]].forEach(m=>mode.appendChild(el("option",{value:m[0]},m[1])));
+ field(s,"Problema",mode);
+ const tech=el("select",{id:"tech"});field(s,"Técnica (vacío = la de por defecto)",tech);
+ const fl=el("div",{id:"fl"});
+ const fill=()=>{tech.textContent="";TECH[mode.value].forEach(t=>tech.appendChild(el("option",{value:t},t||"por defecto")));fl.classList.toggle("hide",mode.value!=="maxflow")};
+ fl.append(el("label",{},"Origen"),nodeSelect("src","uk1.uk"),el("label",{},"Destino"),nodeSelect("dst","gr1.gr"));s.appendChild(fl);
+ mode.onchange=fill;fill();
+ const b=el("button",{class:"run"},"Ejecutar");const c=el("button",{class:"run alt"},"Comparar todas las técnicas");s.append(b,c);
+ const box=result(s);
+ async function once(tech){
+  const m=mode.value,I=inputs(-1);let input;
+  if(m==="mst")input={edges:I.edges};
+  if(m==="tsp")input={n:net.nodes.length,edges:I.edges};
+  if(m==="maxflow")input={n:net.nodes.length,edges:I.flow,source:+document.getElementById("src").value,sink:+document.getElementById("dst").value};
+  if(m==="voronoi"){const lo=net.nodes.map(n=>n.lon),la=net.nodes.map(n=>n.lat);input={sites:net.nodes.map(n=>[n.lon,n.lat]),bounds:[Math.min(...lo)-3,Math.min(...la)-3,Math.max(...lo)+3,Math.max(...la)+3]}}
+  if(tech)input.algorithm=tech;
+  return run(m,input)}
+ b.onclick=async()=>{const {out,ms}=await once(tech.value);overlay={};const m=mode.value;
+  if(out.error){showJSON(box,"Error",out);return}
+  if(m==="mst"){overlay.mst=out.edges;const total=out.edges.reduce((a,e)=>a+e[2],0);overlay.note="Árbol de expansión mínima en verde: "+out.edges.length+" enlaces, costo total "+total+".";showJSON(box,"Costo total "+total,out,ms)}
+  if(m==="tsp"){overlay.route=out.route;overlay.note="Ruta de mantenimiento en naranja ("+(out.algorithm)+"), costo "+(out.cost!==undefined?out.cost:"?")+".";showJSON(box,"Algoritmo: "+out.algorithm,out,ms)}
+  if(m==="maxflow"){overlay.mark=[+document.getElementById("src").value,+document.getElementById("dst").value];overlay.note="Flujo máximo entre los nodos marcados: "+out.maxFlow+" Mbit/s.";showJSON(box,"Flujo máximo "+out.maxFlow+" Mbit/s",out,ms)}
+  if(m==="voronoi"){overlay.cells=out.cells;overlay.note="Zona de cobertura de cada nodo (celdas de Voronoi sobre longitud/latitud).";showJSON(box,"Celdas: "+out.cells.length,out,ms)}
+  drawMap()};
+ c.onclick=async()=>{box.textContent="";const t=el("table");t.appendChild(el("tr")).append(el("th",{},"Técnica"),el("th",{},"Tiempo (ms)"),el("th",{},"Resultado"));
+  for(const x of TECH[mode.value]){const {out,ms}=await once(x);const r=el("tr");const v=out.maxFlow!==undefined?out.maxFlow:(out.cost!==undefined?out.cost:(out.edges?out.edges.reduce((a,e)=>a+e[2],0):(out.cells?out.cells.length+" celdas":"?")));r.append(el("td",{},x||"por defecto"),el("td",{},ms.toFixed(1)),el("td",{},String(v)));t.appendChild(r)}
+  box.appendChild(t);box.appendChild(el("p",{class:"note"},"Tamaño de la red: 22 nodos. Para comparar con grafos grandes usa results/benchmarks.md."))};
+ side.appendChild(s);overlay={};
+}
+
+function marked(text,ranges){let out=[],pos=0;ranges.slice().sort((a,b)=>a[0]-b[0]).forEach(([a,b])=>{if(a>pos)out.push(document.createTextNode(text.slice(pos,a-1)));out.push(el("mark",{},text.slice(a-1,b)));pos=b});out.push(document.createTextNode(text.slice(pos)));return out}
+function renderCyber(side){
+ const s=el("section");s.appendChild(el("h2",{},"Cybersecurity Console"));
+ s.appendChild(el("p",{class:"note"},"Las transmisiones se generan con la matriz de tráfico de GÉANT (cada demanda se codifica en hexadecimal). Puedes editarlas."));
+ const sig=el("textarea",{id:"sig"});sig.value=[(net.payloads[0]||"").slice(16,24),(net.payloads[1]||"").slice(32,40),"DEADBEEF"].join("\n");
+ const t1=el("textarea",{id:"t1"}),t2=el("textarea",{id:"t2"});t1.value=net.payloads[0]||"";t2.value=net.payloads[1]||"";
+ field(s,"Firmas de malware (una por línea)",sig);field(s,"Transmisión 1",t1);field(s,"Transmisión 2",t2);
+ const b=el("button",{class:"run"},"Analizar");s.appendChild(b);const box=result(s);
+ b.onclick=async()=>{const tx=[t1.value,t2.value];box.textContent="";
+  const m=await run("matching",{signatures:sig.value.split("\n").map(x=>x.trim()).filter(Boolean),transmissions:tx});
+  const p=await run("palindrome",{transmissions:tx});const c=await run("commonsubstr",{transmissions:tx});
+  box.appendChild(el("h2",{},"Firmas (primera posición, 0 = no aparece)"));box.appendChild(el("pre",{},JSON.stringify(m.out.positions||m.out)));
+  box.appendChild(el("h2",{},"Palíndromo más largo"));
+  tx.forEach((x,i)=>{const r=(p.out.ranges||[])[i];const d=el("div",{class:"seq"});if(r)marked(x.replace(/\s/g,"").toUpperCase(),[r]).forEach(n=>d.appendChild(n));box.appendChild(d);box.appendChild(el("p",{class:"note"},"Transmisión "+(i+1)+": posiciones "+(r?r.join("–"):"?")))});
+  box.appendChild(el("h2",{},"Subcadena común más larga"));const r=c.out.range;box.appendChild(el("p",{},r?("posiciones "+r.join("–")+" en la transmisión 1 ("+(c.out.length||"")+" caracteres)"):JSON.stringify(c.out)));
+  tx.forEach(x=>{const d=el("div",{class:"seq"});if(r)marked(x.replace(/\s/g,"").toUpperCase(),[r]).forEach(n=>d.appendChild(n));box.appendChild(d)})};
+ side.appendChild(s);overlay={note:"La consola trabaja sobre las transmisiones, no sobre el mapa."};
+}
+
+function renderScenario(side){
+ const s=el("section");s.appendChild(el("h2",{},"Scenario Manager — caída de un enlace"));
+ const ls=el("select",{id:"cut"});net.links.forEach((l,i)=>ls.appendChild(el("option",{value:i},net.nodes[l.u].name+" – "+net.nodes[l.v].name)));
+ field(s,"Enlace que deja de funcionar",ls);
+ const fl=el("div");fl.append(el("label",{},"Flujo desde"),nodeSelect("ssrc","uk1.uk"),el("label",{},"hasta"),nodeSelect("sdst","gr1.gr"));s.appendChild(fl);
+ const b=el("button",{class:"run"},"Simular caída");s.appendChild(b);const box=result(s);
+ b.onclick=async()=>{const i=+ls.value;cut=i;const n=net.nodes.length,A=inputs(-1),B=inputs(i);
+  const src=+document.getElementById("ssrc").value,dst=+document.getElementById("sdst").value;
+  const q=async I=>({mst:(await run("mst",{edges:I.edges})).out,flow:(await run("maxflow",{n,edges:I.flow,source:src,sink:dst})).out});
+  const a=await q(A),d=await q(B);const cost=o=>o.mst.edges.reduce((x,e)=>x+e[2],0);
+  const conn=o=>o.mst.edges.length===n-1;
+  const t=el("table");t.appendChild(el("tr")).append(el("th",{},""),el("th",{},"Antes"),el("th",{},"Sin el enlace"));
+  const rows=[["Red conectada",conn(a)?"sí":"no",conn(d)?"sí":"no"],["Costo del árbol mínimo",cost(a),cost(d)],["Flujo máximo (Mbit/s)",a.flow.maxFlow,d.flow.maxFlow]];
+  rows.forEach(r=>{const tr=el("tr");r.forEach(x=>tr.appendChild(el("td",{},String(x))));t.appendChild(tr)});
+  box.textContent="";box.appendChild(t);
+  box.appendChild(el("p",{class:"note"},"El flujo máximo es igual al corte mínimo entre los dos nodos. Si baja, el enlace caído formaba parte de ese corte."));
+  overlay={mst:d.mst.edges,mark:[src,dst],note:"En rojo: enlace caído. En verde: árbol mínimo que queda sin él."};drawMap()};
+ const rk=el("button",{class:"run alt"},"Buscar enlaces críticos");s.appendChild(rk);
+ rk.onclick=async()=>{const n=net.nodes.length,src=+document.getElementById("ssrc").value,dst=+document.getElementById("sdst").value;
+  box.textContent="Calculando "+net.links.length+" escenarios con el programa en C++...";
+  const base=inputs(-1);const f0=(await run("maxflow",{n,edges:base.flow,source:src,sink:dst})).out.maxFlow;
+  const c0=(await run("mst",{edges:base.edges})).out.edges.reduce((a,e)=>a+e[2],0);
+  const filas=[];
+  for(let i=0;i<net.links.length;i++){const I=inputs(i);
+   const f=(await run("maxflow",{n,edges:I.flow,source:src,sink:dst})).out.maxFlow;
+   const m=(await run("mst",{edges:I.edges})).out.edges;
+   const conectada=m.length===n-1;filas.push({i,perdida:f0-f,conectada,costo:conectada?m.reduce((a,e)=>a+e[2],0)-c0:null})}
+  filas.sort((a,b)=>(a.conectada===b.conectada?0:(a.conectada?1:-1))||b.perdida-a.perdida||(b.costo||0)-(a.costo||0));
+  const t=el("table");t.appendChild(el("tr")).append(el("th",{},"Enlace"),el("th",{},"Flujo perdido"),el("th",{},"Conectada"),el("th",{},"Costo extra MST"));
+  filas.slice(0,8).forEach(r=>{const tr=el("tr");const l=net.links[r.i];tr.append(el("td",{},net.nodes[l.u].name+" – "+net.nodes[l.v].name),el("td",{},r.perdida+" Mbit/s"),el("td",{class:r.conectada?"ok":"bad"},r.conectada?"sí":"NO"),el("td",{},r.costo===null?"—":"+"+r.costo));
+   tr.style.cursor="pointer";tr.onclick=()=>{ls.value=r.i;b.onclick()};t.appendChild(tr)});
+  box.textContent="";box.appendChild(el("p",{},"Flujo base "+f0+" Mbit/s. Enlaces cuya caída más daña la red (clic en una fila para simularla):"));box.appendChild(t)};
+ side.appendChild(s);overlay={};
+}
+
+function render(){const side=document.getElementById("side");side.textContent="";
+ [renderExplorer,renderLab,renderCyber,renderScenario][tab](side);drawMap()}
+
+(async()=>{net=await (await fetch("/api/network")).json();document.getElementById("showNY").onchange=drawMap;renderTabs();render()})();
+</script>
+</body>
+</html>

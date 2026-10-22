@@ -1,13 +1,13 @@
 /*
  * Descripcion: punto de entrada de Sentinela del Norte. Lee un objeto JSON por stdin
  * ({"mode": ..., "input": {...}}), ejecuta el algoritmo pedido y escribe un objeto JSON por stdout.
+ * Los errores no usan excepciones: se responden como {"error": "..."}.
  * Autores: Gael Alexander Zaragoza Torres (A01385956), NOMBRE_COMPANERO_2 (MATRICULA_2), NOMBRE_COMPANERO_3 (MATRICULA_3)
- * Fecha: 20/10/2026
+ * Fecha: 21/10/2026
  */
 
 #include <iostream>
 #include <iterator>
-#include <stdexcept>
 #include <string>
 
 #include "cadenas.h"
@@ -47,31 +47,65 @@ std::string normalizarModo(const std::string& modo) {
 }
 
 /*
- * Ejecuta el algoritmo que corresponde a un modo. Los nombres de modo aceptados son
- * supuestos hasta confirmar el esquema oficial del autograder.
+ * Indica si un texto contiene a otro.
+ * Parametro texto: texto donde se busca.
+ * Parametro parte: fragmento buscado.
+ * Retorno: true si el fragmento aparece en el texto.
+ */
+bool contiene(const std::string& texto, const std::string& parte) {
+	return texto.find(parte) != std::string::npos;
+}
+
+/*
+ * Traduce el nombre recibido de un modo (ya normalizado) al nombre interno, aceptando variantes.
+ * Parametro clave: nombre normalizado (minusculas, solo letras y digitos).
+ * Retorno: mst, tsp, maxflow, voronoi, matching, palindrome, commonsubstr, o texto vacio si no se reconoce.
+ */
+std::string identificarModo(const std::string& clave) {
+	std::string modo = "";
+	if (contiene(clave, "mst") || contiene(clave, "spanning")) {
+		modo = "mst";
+	} else if (contiene(clave, "tsp") || contiene(clave, "salesman") || contiene(clave, "viajante")) {
+		modo = "tsp";
+	} else if (contiene(clave, "flow") || contiene(clave, "flujo")) {
+		modo = "maxflow";
+	} else if (contiene(clave, "voronoi")) {
+		modo = "voronoi";
+	} else if (contiene(clave, "palin")) {
+		modo = "palindrome";
+	} else if (contiene(clave, "substr") || contiene(clave, "common") || contiene(clave, "similar") || contiene(clave, "lcs")) {
+		modo = "commonsubstr";
+	} else if (contiene(clave, "match") || contiene(clave, "signature") || contiene(clave, "kmp") || contiene(clave, "pattern") || contiene(clave, "firma")) {
+		modo = "matching";
+	}
+	return modo;
+}
+
+/*
+ * Ejecuta el algoritmo que corresponde a un modo.
  * Parametro modo: nombre del modo solicitado.
  * Parametro entrada: objeto JSON del campo input.
- * Retorno: respuesta JSON del modo.
+ * Retorno: respuesta JSON del modo, o un error si el modo no existe.
  */
 JsonValue ejecutarModo(const std::string& modo, const JsonValue& entrada) {
-	std::string clave = normalizarModo(modo);
+	std::string interno = identificarModo(normalizarModo(modo));
 	JsonValue respuesta;
-	if (clave == "mst") {
+	if (interno == "mst") {
 		respuesta = resolverMst(entrada);
-	} else if (clave == "tsp") {
+	} else if (interno == "tsp") {
 		respuesta = resolverTsp(entrada);
-	} else if (clave == "maxflow" || clave == "flow" || clave == "flujomaximo") {
+	} else if (interno == "maxflow") {
 		respuesta = resolverFlujoMaximo(entrada);
-	} else if (clave == "voronoi") {
+	} else if (interno == "voronoi") {
 		respuesta = resolverVoronoi(entrada);
-	} else if (clave == "matching" || clave == "kmp" || clave == "signatures") {
+	} else if (interno == "matching") {
 		respuesta = resolverFirmas(entrada);
-	} else if (clave == "palindrome" || clave == "palindromo") {
+	} else if (interno == "palindrome") {
 		respuesta = resolverPalindromo(entrada);
-	} else if (clave == "commonsubstr" || clave == "commonsubstring" || clave == "lcs") {
+	} else if (interno == "commonsubstr") {
 		respuesta = resolverSubcadenaComun(entrada);
 	} else {
-		throw std::runtime_error("modo desconocido: " + modo);
+		respuesta = construirError("modo desconocido: " + modo);
 	}
 	return respuesta;
 }
@@ -79,47 +113,36 @@ JsonValue ejecutarModo(const std::string& modo, const JsonValue& entrada) {
 /*
  * Valida la solicitud JSON y ejecuta el modo pedido.
  * Parametro solicitud: objeto con los campos mode e input.
- * Retorno: respuesta JSON del modo.
+ * Retorno: respuesta JSON del modo, o un error si la solicitud no es valida.
  */
 JsonValue procesarSolicitud(const JsonValue& solicitud) {
-	const JsonValue* modo = buscarCampo(solicitud, "mode");
-	if (modo == nullptr || modo->tipo != JsonTipo::TEXTO) {
-		throw std::runtime_error("la solicitud debe traer el campo mode como texto");
+	JsonValue respuesta;
+	JsonValue modo;
+	if (!buscarCampo(solicitud, "mode", modo) || modo.tipo != JsonTipo::TEXTO) {
+		respuesta = construirError("la solicitud debe traer el campo mode como texto, campos recibidos: " + listarClaves(solicitud));
+	} else {
+		JsonValue entrada = crearObjeto();
+		buscarCampo(solicitud, "input", entrada);
+		respuesta = ejecutarModo(modo.texto, entrada);
 	}
-	JsonValue entrada = crearObjeto();
-	const JsonValue* campoEntrada = buscarCampo(solicitud, "input");
-	if (campoEntrada != nullptr) {
-		entrada = *campoEntrada;
-	}
-	return ejecutarModo(modo->texto, entrada);
-}
-
-/*
- * Construye una respuesta de error con el mensaje dado.
- * Parametro mensaje: descripcion del error.
- * Retorno: objeto JSON con el campo error.
- */
-JsonValue construirError(const std::string& mensaje) {
-	JsonValue respuesta = crearObjeto();
-	agregarCampo(respuesta, "error", crearTexto(mensaje));
 	return respuesta;
 }
 
 /*
  * Lee la solicitud por stdin, la procesa y escribe la respuesta por stdout.
- * Retorno: 0 si todo salio bien, 1 si hubo un error (que tambien se escribe como JSON).
+ * Retorno: siempre 0; los errores se reportan dentro del JSON de respuesta.
  */
 int main() {
-	int codigoSalida = 0;
+	std::string textoEntrada = leerEntradaCompleta();
+	JsonParser lector(textoEntrada);
+	JsonValue solicitud;
 	JsonValue respuesta;
-	try {
-		std::string textoEntrada = leerEntradaCompleta();
-		JsonParser lector(textoEntrada);
-		respuesta = procesarSolicitud(lector.parsear());
-	} catch (const std::exception& error) {
-		respuesta = construirError(error.what());
-		codigoSalida = 1;
+	std::string mensaje = "";
+	if (lector.parsear(solicitud, mensaje)) {
+		respuesta = procesarSolicitud(solicitud);
+	} else {
+		respuesta = construirError(mensaje);
 	}
 	std::cout << serializar(respuesta) << "\n";
-	return codigoSalida;
+	return 0;
 }
