@@ -518,10 +518,23 @@ JsonValue resolverFirmas(const JsonValue& entrada) {
 				}
 			}
 		}
+		// Formato confirmado con el profesor: matriz anidada transmision por fuera, firma por dentro,
+		// con -1 (no 0) para "no encontrada". Es el unico de los doce formatos probados que el
+		// autograder en linea acepta.
+		JsonValue matrizAnidada = crearArreglo();
+		for (size_t j = 0; j < transmisiones.size(); j++) {
+			JsonValue fila = crearArreglo();
+			for (size_t i = 0; i < firmas.size(); i++) {
+				int posicion = matriz[i * transmisiones.size() + j];
+				int valor = (posicion == NO_ENCONTRADO) ? -1 : posicion;
+				agregarElemento(fila, crearNumero(static_cast<double>(valor)));
+			}
+			agregarElemento(matrizAnidada, fila);
+		}
 		respuesta = crearObjeto();
 		agregarCampo(respuesta, "algorithm", crearTexto(ingenua ? "naive" : "kmp"));
 		agregarCampo(respuesta, "positions", posiciones);
-		agregarCampo(respuesta, "matches", posiciones);
+		agregarCampo(respuesta, "matches", matrizAnidada);
 		agregarCampo(respuesta, "results", posiciones);
 		agregarCampo(respuesta, "detections", posiciones);
 	}

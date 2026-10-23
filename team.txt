@@ -19,3 +19,8 @@ Integrantes, matriculas y contribuciones:
    binaria y por programacion dinamica; aplicacion SENTINEL Digital Twin (app/server.py, app/static) y
    el pipeline que convierte la red GEANT de SNDlib en entradas de los siete modos (app/geant.py).
 
+Notas:
+- El equipo es de tres integrantes. La pagina del reto supone equipos de cuatro; se consulto con el
+  profesor y se trabajo con tres.
+- Las pruebas, los benchmarks y la revision del estandar de codificacion se hicieron entre los tres.
+- Todos los integrantes pueden explicar los siete algoritmos, no solo los que implementaron.

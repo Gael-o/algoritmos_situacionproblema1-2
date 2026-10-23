@@ -1,6 +1,11 @@
 {
-  "nombre": "Estres sintetico, 300 nodos",
+  "nombre": "Estrés sintético, 300 nodos",
   "descripcion": "Red generada con semilla fija: 300 nodos, 1200 enlaces y 1200 demandas. Sirve para ver que los algoritmos aguantan instancias grandes y que el TSP cambia a la ruta aproximada.",
   "fuente": "Generada por app/geant.py con semilla 7 (no es un dato real)",
-  "generar": {"nodos": 300, "enlaces": 1200, "demandas": 1200, "semilla": 7}
+  "generar": {
+    "nodos": 300,
+    "enlaces": 1200,
+    "demandas": 1200,
+    "semilla": 7
+  }
 }

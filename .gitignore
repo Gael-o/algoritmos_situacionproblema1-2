@@ -3,3 +3,6 @@ sentinel.exe
 *.o
 *.out
 build/
+__pycache__/
+*.pyc
+results/geant_resultados.json

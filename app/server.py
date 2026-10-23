@@ -32,11 +32,14 @@ def descripcionRed(red):
     transmisiones = red.get("transmisiones") or geant.cargaComoHexadecimal(red)[:2]
     firmas = red.get("firmas") or geant.firmasDeEjemplo(transmisiones)
     flujo = red.get("flujo") or {}
+    retardos = geant.retardosEnlaces(red)
     return {
         "scenario": red.get("escenario", {"id": "", "nombre": "", "descripcion": "", "fuente": ""}),
         "nodes": [{"id": i, "name": red["nombres"][i], "lon": red["coords"][i][0], "lat": red["coords"][i][1], "load": carga[i]}
                   for i in range(len(red["nombres"]))],
-        "links": [{"u": u, "v": v, "capacity": c, "cost": k} for (u, v, c, k) in red["enlaces"]],
+        "links": [{"u": u, "v": v, "capacity": c, "cost": k, "km": round(retardos[i] * geant.VELOCIDAD_FIBRA_KM_POR_MS, 1), "delay": retardos[i]}
+                  for i, (u, v, c, k) in enumerate(red["enlaces"])],
+        "hopDelay": geant.RETARDO_PROCESAMIENTO_MS,
         "demands": len(red["demandas"]),
         "payloads": transmisiones,
         "signatures": firmas,

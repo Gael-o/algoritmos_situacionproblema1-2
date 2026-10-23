@@ -252,9 +252,68 @@ void determinarExtremos(const JsonValue& entrada, const Grafo& grafo, int& fuent
 }
 
 /*
+ * Agrega a la respuesta el detalle del flujo ya calculado: cuanto pasa por cada arista (flows, en
+ * el mismo orden de la entrada, como [origen, destino, flujo, capacidad]; el flujo es negativo si
+ * va del destino hacia el origen de la arista), el corte minimo (las aristas con capacidad que
+ * cruzan del lado de la fuente al lado del sumidero en la red residual) y su capacidad, que debe
+ * ser igual al flujo maximo. El lado de la fuente son los nodos que todavia se alcanzan con
+ * capacidad sobrante. Una arista con capacidad 0 (por ejemplo, un enlace caido) no entra al corte.
+ * Parametro grafo: grafo con los identificadores y las capacidades originales.
+ * Parametro red: red residual despues de calcular el flujo maximo.
+ * Parametro fuente: indice de la fuente.
+ * Parametro dirigido: si es false, cada arista se podia usar en los dos sentidos.
+ * Parametro respuesta: objeto JSON al que se agregan flows, minCut, minCutCapacity y sourceSide.
+ */
+void agregarDetalleFlujo(const Grafo& grafo, const RedFlujo& red, int fuente, bool dirigido, JsonValue& respuesta) {
+	std::vector<int> nivel;
+	calcularNiveles(red, fuente, nivel);
+	JsonValue flujos = crearArreglo();
+	JsonValue corte = crearArreglo();
+	double capacidadCorte = 0.0;
+	for (size_t i = 0; i < grafo.aristas.size(); i++) {
+		const Arista& arista = grafo.aristas[i];
+		double flujo = arista.costo - red.arcos[2 * i].capacidad;
+		if (flujo < CAPACIDAD_MINIMA && flujo > -CAPACIDAD_MINIMA) {
+			flujo = 0.0;
+		}
+		JsonValue detalle = crearArreglo();
+		agregarElemento(detalle, grafo.identificadores[static_cast<size_t>(arista.origen)]);
+		agregarElemento(detalle, grafo.identificadores[static_cast<size_t>(arista.destino)]);
+		agregarElemento(detalle, crearNumero(flujo));
+		agregarElemento(detalle, crearNumero(arista.costo));
+		agregarElemento(flujos, detalle);
+		bool origenEnFuente = nivel[static_cast<size_t>(arista.origen)] >= 0;
+		bool destinoEnFuente = nivel[static_cast<size_t>(arista.destino)] >= 0;
+		bool cruzaDirecto = origenEnFuente && !destinoEnFuente;
+		bool cruzaInverso = !dirigido && destinoEnFuente && !origenEnFuente;
+		bool tieneCapacidad = arista.costo > CAPACIDAD_MINIMA;
+		if ((cruzaDirecto || cruzaInverso) && tieneCapacidad) {
+			JsonValue enlace = crearArreglo();
+			agregarElemento(enlace, grafo.identificadores[static_cast<size_t>(arista.origen)]);
+			agregarElemento(enlace, grafo.identificadores[static_cast<size_t>(arista.destino)]);
+			agregarElemento(enlace, crearNumero(arista.costo));
+			agregarElemento(enlace, crearNumero(static_cast<double>(i)));
+			agregarElemento(corte, enlace);
+			capacidadCorte += arista.costo;
+		}
+	}
+	JsonValue ladoFuente = crearArreglo();
+	for (size_t i = 0; i < nivel.size(); i++) {
+		if (nivel[i] >= 0) {
+			agregarElemento(ladoFuente, grafo.identificadores[i]);
+		}
+	}
+	agregarCampo(respuesta, "flows", flujos);
+	agregarCampo(respuesta, "minCut", corte);
+	agregarCampo(respuesta, "minCutCapacity", crearNumero(capacidadCorte));
+	agregarCampo(respuesta, "sourceSide", ladoFuente);
+}
+
+/*
  * Resuelve el modo de flujo maximo: lee la red con capacidades y calcula el flujo de fuente a sumidero.
  * Parametro entrada: objeto JSON del campo input (aristas con capacidad, fuente y sumidero).
- * Retorno: respuesta JSON con el valor del flujo maximo, o un error si la entrada no se reconoce.
+ * Retorno: respuesta JSON con el valor del flujo maximo y su detalle por arista, o un error si la
+ * entrada no se reconoce.
  */
 JsonValue resolverFlujoMaximo(const JsonValue& entrada) {
 	Grafo grafo;
@@ -297,6 +356,7 @@ JsonValue resolverFlujoMaximo(const JsonValue& entrada) {
 		agregarCampo(respuesta, "max_flow", crearNumero(valor));
 		agregarCampo(respuesta, "flow", crearNumero(valor));
 		agregarCampo(respuesta, "value", crearNumero(valor));
+		agregarDetalleFlujo(grafo, red, fuente, dirigido, respuesta);
 	}
 	return respuesta;
 }

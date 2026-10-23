@@ -1,8 +1,8 @@
 # Pruebas
 
-- `bash tests/ejecutarPruebas.sh`: compila y verifica casos conocidos de los 7 modos (incluye los ejemplos oficiales de la pagina).
-- `python3 tests/equivalencia.py ./sentinel`: comprueba que las dos tecnicas de cada modo den el mismo resultado en cientos de casos aleatorios.
-- `python3 tests/estres.py ./sentinel`: compara contra fuerza bruta (palindromos, subcadena comun, TSP pequeno) y contra una implementacion de referencia (flujo), y revisa que las celdas de Voronoi sumen el area del dominio.
+- `bash tests/ejecutarPruebas.sh`: compila y verifica 28 casos conocidos de los 8 modos (incluye los ejemplos oficiales de la pagina).
+- `python3 tests/equivalencia.py ./sentinel`: comprueba que las dos tecnicas de cada modo den el mismo resultado en cientos de casos aleatorios. En propagacion, Dijkstra y Bellman-Ford deben dar el mismo arbol completo (distancias, saltos, padres y tiempos), no solo la misma distancia.
+- `python3 tests/estres.py ./sentinel`: compara contra fuerza bruta (palindromos, subcadena comun, TSP pequeno) y contra implementaciones de referencia en Python (flujo con Edmonds-Karp, propagacion con Floyd-Warshall con fallas al azar), revisa el detalle del flujo (capacidades, conservacion, corte minimo igual al flujo y que el corte separe fuente y sumidero) y que las celdas de Voronoi sumen el area del dominio.
 - `python3 tests/benchmark.py ./sentinel results/`: genera los benchmarks.
 
 ## Ejemplos oficiales de la pagina del reto (cadenas)
@@ -26,5 +26,6 @@ Posiciones en base 1.
 
 - `mst_basico.json`: 5 nodos, 7 aristas. Arbol esperado: 0-2 (1), 1-2 (2), 3-4 (3), 1-3 (5). Costo total 11.
 - `tsp_basico.json`: 4 ciudades, costo optimo 80.
-- `flujo_basico.json`: red clasica de 6 nodos, flujo maximo 23.
+- `flujo_basico.json`: red clasica de 6 nodos, flujo maximo 23; corte minimo 1-3 (12), 4-3 (7) y 4-5 (4), que suma 23.
+- `propagacion_basico.json`: 5 nodos y 6 enlaces con retardos. Ruta minima de 0 a 4: 0-2-1-3-4, distancia 11, llega en 15 ms con 1 ms de procesamiento por salto. Si cae 2-1 se reencamina por 0-1-3-4; si cae el nodo 3, el 4 queda aislado.
 - `voronoi_basico.json`: 3 sitios en un dominio de 30 x 30; las celdas suman 900.

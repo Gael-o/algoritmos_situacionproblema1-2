@@ -14,6 +14,7 @@
 #include "flujo.h"
 #include "json.h"
 #include "mst.h"
+#include "propagacion.h"
 #include "tsp.h"
 #include "voronoi.h"
 
@@ -59,7 +60,9 @@ bool contiene(const std::string& texto, const std::string& parte) {
 /*
  * Traduce el nombre recibido de un modo (ya normalizado) al nombre interno, aceptando variantes.
  * Parametro clave: nombre normalizado (minusculas, solo letras y digitos).
- * Retorno: mst, tsp, maxflow, voronoi, matching, palindrome, commonsubstr, o texto vacio si no se reconoce.
+ * La propagacion se revisa al final para que no le quite nombres a los siete modos del reto.
+ * Retorno: mst, tsp, maxflow, voronoi, matching, palindrome, commonsubstr, propagation, o texto
+ * vacio si no se reconoce.
  */
 std::string identificarModo(const std::string& clave) {
 	std::string modo = "";
@@ -77,6 +80,8 @@ std::string identificarModo(const std::string& clave) {
 		modo = "commonsubstr";
 	} else if (contiene(clave, "match") || contiene(clave, "signature") || contiene(clave, "kmp") || contiene(clave, "pattern") || contiene(clave, "firma")) {
 		modo = "matching";
+	} else if (contiene(clave, "propag") || contiene(clave, "route") || contiene(clave, "ruta") || contiene(clave, "dijkstra") || contiene(clave, "shortest")) {
+		modo = "propagation";
 	}
 	return modo;
 }
@@ -104,6 +109,8 @@ JsonValue ejecutarModo(const std::string& modo, const JsonValue& entrada) {
 		respuesta = resolverPalindromo(entrada);
 	} else if (interno == "commonsubstr") {
 		respuesta = resolverSubcadenaComun(entrada);
+	} else if (interno == "propagation") {
+		respuesta = resolverPropagacion(entrada);
 	} else {
 		respuesta = construirError("modo desconocido: " + modo);
 	}

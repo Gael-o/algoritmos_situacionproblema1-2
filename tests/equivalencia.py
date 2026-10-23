@@ -38,6 +38,16 @@ for _ in range(150):
         e = {"n": n, "edges": aristas, "source": 0, "sink": n - 1}
         comprobar("flujo", correr("maxflow", e, "dinic")["maxFlow"] == correr("maxflow", e, "edmondskarp")["maxFlow"], e)
 
+for _ in range(150):
+    n = random.randint(1, 25)
+    aristas = [[random.randrange(n), random.randrange(n), random.randint(1, 6)] for _ in range(random.randint(0, 3 * n))]
+    aristas = [a for a in aristas if a[0] != a[1]]
+    e = {"n": n, "edges": aristas, "delays": [random.randint(1, 40) for _ in aristas], "hopDelay": 1,
+         "source": random.randrange(n), "failedLinks": [i for i in range(len(aristas)) if random.random() < 0.2]}
+    a = correr("propagation", e, "dijkstra")
+    b = correr("propagation", e, "bellmanford")
+    comprobar("propagacion", a["nodes"] == b["nodes"] and a["events"] == b["events"], e)
+
 razones = []
 for _ in range(40):
     n = random.randint(5, 14)

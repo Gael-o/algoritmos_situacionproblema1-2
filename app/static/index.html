@@ -4,211 +4,2166 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SENTINEL Digital Twin</title>
+<!--
+  SENTINEL Digital Twin: interfaz de Sentinela del Norte sobre la red GEANT (SNDlib).
+  Esta pagina NO calcula ningun algoritmo: arma el JSON de entrada, se lo manda al servidor
+  (que ejecuta ./sentinel, el mismo programa que evalua el autograder) y dibuja la respuesta.
+  Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena (A01385923),
+  David Rangel Monsivais (A01385671). Fecha: 22/10/2026.
+-->
 <style>
-:root{--bg:#f6f7f9;--panel:#fff;--ink:#16202a;--mute:#5b6773;--line:#d7dce2;--acc:#0b6bcb;--ok:#1a8a4a;--bad:#c0392b;--mst:#1a8a4a;--route:#d97706;--cell:#0b6bcb}
-@media (prefers-color-scheme:dark){:root{--bg:#10151b;--panel:#18202a;--ink:#e6ebf0;--mute:#9aa7b4;--line:#2a3541;--acc:#5aa9ff;--ok:#4cc27f;--bad:#ff6b5e;--mst:#4cc27f;--route:#f5a524;--cell:#5aa9ff}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Segoe UI,Roboto,sans-serif}
-header{padding:14px 16px;border-bottom:1px solid var(--line);background:var(--panel)}
-header h1{margin:0;font-size:18px}header p{margin:2px 0 0;color:var(--mute);font-size:13px}
-nav{display:flex;gap:6px;padding:10px 16px;flex-wrap:wrap}
-nav button{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:8px 12px;border-radius:8px;cursor:pointer;font:inherit}
-nav button.on{background:var(--acc);color:#fff;border-color:var(--acc)}
-main{padding:0 16px 24px;display:grid;gap:14px;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr)}
-@media (max-width:900px){main{grid-template-columns:1fr}}
-section{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;min-width:0}
-h2{margin:0 0 8px;font-size:16px}
-label{display:block;font-size:13px;color:var(--mute);margin:8px 0 3px}
-select,textarea,input{width:100%;padding:7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
-textarea{font-family:ui-monospace,Consolas,monospace;font-size:13px;min-height:70px}
-button.run{margin-top:10px;background:var(--acc);color:#fff;border:0;padding:9px 14px;border-radius:8px;cursor:pointer;font:inherit}
-button.alt{background:transparent;color:var(--acc);border:1px solid var(--acc);margin-left:6px}
-svg{width:100%;height:auto;background:var(--bg);border-radius:8px;border:1px solid var(--line)}
-pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;max-height:240px;font-size:12px;margin:8px 0 0}
-table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left}
+:root{
+ --bg:#f3f5f7;--panel:#ffffff;--ink:#15202b;--mute:#5a6772;--line:#d6dce2;--soft:#eef1f4;
+ --mar:#e6edf3;--tierra:#ffffff;
+ --acc:#0b6bcb;--acc2:#c76a00;--ok:#1a7f45;--bad:#c0392b;
+ --enlace:#9aa7b4;--nodo:#3d4b58;--inactivo:#b3bec8;
+ --mst:#1a7f45;--ruta:#c76a00;--celda:#0b6bcb;
+ --flujoBajo:#9cc6ec;--flujoAlto:#0b4f9c;--saturado:#e8590c;--corte:#7a1fa2;
+ --paquete:#e8590c;--alcanzado:#0b6bcb;--critico:#e8590c;
+ --sobreAcento:#ffffff;
+ --sombra:0 6px 24px rgba(16,24,32,.12);
+}
+@media (prefers-color-scheme:dark){:root{
+ --bg:#0f141a;--panel:#171f28;--ink:#e6ebf0;--mute:#9aa7b4;--line:#2b3744;--soft:#1e2833;
+ --mar:#121a22;--tierra:#1a232d;
+ --acc:#5aa9ff;--acc2:#ffad42;--ok:#4cc27f;--bad:#ff6b5e;
+ --enlace:#4e5d6c;--nodo:#c9d3dc;--inactivo:#55636f;
+ --mst:#4cc27f;--ruta:#ffad42;--celda:#5aa9ff;
+ --flujoBajo:#1f4f7a;--flujoAlto:#7cc0ff;--saturado:#ff8a3d;--corte:#d28cff;
+ --paquete:#ff8a3d;--alcanzado:#5aa9ff;--critico:#ff8a3d;
+ --sobreAcento:#0f141a;
+ --sombra:0 6px 24px rgba(0,0,0,.45);
+}}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,"Segoe UI",Roboto,sans-serif}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* ---------- Barra superior con menus desplegables ---------- */
+.barra{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;padding:0 14px;height:56px;background:var(--panel);border-bottom:1px solid var(--line)}
+.marca{display:flex;align-items:center;gap:9px;white-space:nowrap}
+.marca strong{display:block;font-size:15px;letter-spacing:.04em}
+.marca span{display:block;font-size:12px;color:var(--mute);margin-top:-3px}
+.menu{display:flex;align-items:center;gap:2px;flex:1}
+.grupo{position:relative}
+.grupoBoton{background:none;border:0;padding:8px 11px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.grupoBoton:hover,.grupoBoton[aria-expanded="true"]{background:var(--soft)}
+.grupoBoton.activo{color:var(--acc);font-weight:600}
+.grupoBoton svg{width:10px;height:10px;transition:transform .15s}
+.grupoBoton[aria-expanded="true"] svg{transform:rotate(180deg)}
+.desplegable{position:absolute;top:calc(100% + 6px);left:0;min-width:270px;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:var(--sombra);padding:6px;display:none}
+.grupo.abierto .desplegable{display:block}
+.opcion{display:block;width:100%;text-align:left;background:none;border:0;border-radius:7px;padding:8px 10px;cursor:pointer}
+.opcion:hover,.opcion:focus-visible{background:var(--soft)}
+.opcion.activa{background:var(--soft);box-shadow:inset 3px 0 0 var(--acc)}
+.opcion small{display:block;color:var(--mute);font-size:12px;line-height:1.35}
+.separador{height:1px;background:var(--line);margin:5px 4px}
+.estadoBarra{display:flex;gap:8px;align-items:center;margin-left:auto}
+.chip{border:1px solid var(--line);background:var(--panel);border-radius:99px;padding:3px 11px;font-size:13px;color:var(--mute);white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+button.chip{cursor:pointer}
+.chip.alerta{border-color:var(--bad);color:var(--bad);font-weight:600}
+.hamburguesa{display:none;margin-left:auto;background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+
+/* ---------- Area de trabajo: mapa + tablero ---------- */
+.area{display:grid;grid-template-columns:minmax(0,1fr) 420px;height:calc(100vh - 56px)}
+.area.ancho{grid-template-columns:minmax(0,1fr) 560px}
+.panelMapa{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0;border-right:1px solid var(--line)}
+.herramientasMapa{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--panel);border-bottom:1px solid var(--line)}
+.segmentado{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;align-items:stretch}
+.segmentado span{padding:5px 9px;font-size:13px;color:var(--mute);border-right:1px solid var(--line);display:flex;align-items:center}
+.segmentado button{background:var(--panel);border:0;border-right:1px solid var(--line);padding:5px 11px;cursor:pointer;font-size:13px}
+.segmentado button:last-child{border-right:0}
+.segmentado button[aria-pressed="true"]{background:var(--acc);color:var(--sobreAcento)}
+.segmentado button.peligro[aria-pressed="true"]{background:var(--bad);color:var(--sobreAcento)}
+.zoom{display:inline-flex;gap:4px}
+.zoom button{background:var(--panel);border:1px solid var(--line);border-radius:8px;min-width:34px;height:32px;padding:0 9px;cursor:pointer;font-size:13px}
+.zoom button:hover{background:var(--soft)}
+.lienzo{position:relative;flex:1;min-height:0;background:var(--mar);overflow:hidden}
+#mapa{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab;user-select:none}
+#mapa:focus{outline:none}
+#mapa:focus-visible{outline:2px solid var(--acc);outline-offset:-3px}
+#mapa.arrastrando{cursor:grabbing}
+#mapa [data-tipo]{cursor:pointer}
+.leyenda{position:absolute;left:10px;bottom:10px;background:color-mix(in srgb,var(--panel) 92%,transparent);border:1px solid var(--line);border-radius:9px;padding:7px 10px;font-size:12px;max-width:min(330px,calc(100% - 20px));pointer-events:none}
+.leyenda:empty{display:none}
+.leyenda div{display:flex;align-items:center;gap:7px;margin:2px 0}
+.leyenda i{display:inline-block;width:20px;height:0;border-top:3px solid;flex:none}
+.leyenda b.punto{display:inline-block;width:11px;height:11px;border-radius:50%;flex:none}
+.leyenda .barraGradiente{width:110px;height:8px;border-radius:4px;flex:none}
+.ayudaMapa{position:absolute;right:10px;bottom:10px;font-size:12px;color:var(--mute);background:color-mix(in srgb,var(--panel) 85%,transparent);border-radius:7px;padding:3px 8px;pointer-events:none}
+#tooltip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--line);border-radius:8px;box-shadow:var(--sombra);padding:7px 10px;font-size:13px;max-width:280px;display:none;z-index:5}
+#tooltip strong{display:block}
+#tooltip span{color:var(--mute);display:block}
+.estadoMapa{margin:0;padding:6px 12px;font-size:13px;color:var(--mute);background:var(--panel);border-top:1px solid var(--line);min-height:32px}
+
+.tablero{overflow:auto;min-height:0;background:var(--panel)}
+.tablero section{padding:16px 18px;border-bottom:1px solid var(--line)}
+.tablero h2{margin:0 0 2px;font-size:18px}
+.tablero h3{margin:14px 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute)}
+.tablero p{margin:6px 0}
+.nota{color:var(--mute);font-size:13px}
+label{display:block;font-size:13px;color:var(--mute);margin:10px 0 4px}
+select,textarea,input[type=text]{width:100%;padding:7px 8px;border:1px solid var(--line);border-radius:7px;background:var(--bg)}
+textarea{font-family:ui-monospace,Consolas,monospace;font-size:13px;min-height:64px;resize:vertical}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.fila{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.fila>*{flex:1}
+.botones{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{background:var(--acc);color:var(--sobreAcento);border:0;border-radius:8px;padding:8px 14px;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sec{background:transparent;color:var(--acc);border:1px solid var(--acc)}
+.btn.peligro{background:transparent;color:var(--bad);border:1px solid var(--bad)}
+.btn.mini{padding:3px 9px;font-size:13px}
+.grande{font-size:30px;font-weight:700;line-height:1.1;margin:8px 0 2px;font-variant-numeric:tabular-nums}
+.tarjetas{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.tarjeta{background:var(--soft);border-radius:9px;padding:9px 11px}
+.tarjeta b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.tarjeta span{font-size:12px;color:var(--mute)}
+table{border-collapse:collapse;width:100%;font-size:13px;margin-top:6px}
+th,td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+th{color:var(--mute);font-weight:600;font-size:12px}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+tr.clic{cursor:pointer}
+tr.clic:hover{background:var(--soft)}
+tr.actual{background:color-mix(in srgb,var(--acc) 14%,transparent)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}
 .pill{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;border:1px solid var(--line);color:var(--mute)}
-.ok{color:var(--ok)}.bad{color:var(--bad)}mark{background:#f5a52455;color:inherit;padding:0 1px}
-.seq{font-family:ui-monospace,Consolas,monospace;font-size:13px;word-break:break-all}
-.hide{display:none}.note{color:var(--mute);font-size:13px}
+.reloj{display:flex;align-items:baseline;gap:10px;margin-top:10px}
+.reloj .grande{margin:0}
+.progreso{height:6px;background:var(--soft);border-radius:3px;overflow:hidden;margin-top:6px}
+.progreso div{height:100%;width:0;background:var(--paquete)}
+.eventos{position:relative;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:6px}
+.eventos table{margin:0}
+.eventos th{position:sticky;top:0;background:var(--panel)}
+.seq{font-family:ui-monospace,Consolas,monospace;font-size:13px;word-break:break-all;background:var(--soft);border-radius:6px;padding:6px 8px;margin:4px 0}
+mark{background:color-mix(in srgb,var(--acc2) 35%,transparent);color:inherit;padding:0 1px;border-radius:2px}
+.lista{margin:6px 0;padding-left:18px}
+.lista li{margin:3px 0}
+.aviso{border-left:3px solid var(--acc2);background:var(--soft);padding:8px 10px;border-radius:0 8px 8px 0;font-size:13px;margin-top:10px}
+.toast{position:fixed;right:16px;bottom:16px;z-index:50;background:var(--ink);color:var(--panel);padding:10px 14px;border-radius:9px;box-shadow:var(--sombra);font-size:14px;max-width:360px;opacity:0;transform:translateY(8px);transition:opacity .2s,transform .2s;pointer-events:none}
+.toast.ver{opacity:1;transform:none}
+.oculto{display:none!important}
+
+/* ---------- Pantallas chicas: el menu se vuelve vertical ---------- */
+@media (max-width:900px){
+ .barra{flex-wrap:wrap;height:auto;min-height:56px;padding:8px 12px}
+ .hamburguesa{display:block}
+ .menu{display:none;order:3;flex-basis:100%;flex-direction:column;align-items:stretch;gap:0;padding-bottom:6px}
+ .barra.menuAbierto .menu{display:flex}
+ .grupoBoton{width:100%;justify-content:space-between;padding:10px 8px}
+ .desplegable{position:static;box-shadow:none;border:0;padding:0 0 4px 10px;min-width:0}
+ .estadoBarra{order:2;margin-left:0;flex-basis:100%}
+ .area,.area.ancho{display:block;height:auto}
+ .panelMapa{height:62vh;border-right:0;border-bottom:1px solid var(--line)}
+}
 </style>
 </head>
 <body>
-<header><h1>SENTINEL Digital Twin &mdash; red GÉANT</h1><p>Todos los cálculos los hace el programa en C++ (<code>./sentinel</code>); esta página solo arma la entrada y dibuja la salida.</p>
-<p>Caso de prueba activo: <strong id="activeScenario">—</strong></p></header>
-<nav id="tabs"></nav>
-<main>
-<div>
- <section><h2 id="mapTitle">Mapa</h2>
-  <svg id="map" viewBox="0 0 700 520" role="img" aria-label="Mapa de la red GÉANT"></svg>
-  <p class="note" id="mapNote"></p>
-  <label id="nyBox"><input type="checkbox" id="showNY" style="width:auto"> Mostrar Nueva York (ny1)</label>
+
+<header class="barra" id="barra">
+ <div class="marca">
+  <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="6" cy="7" r="3" fill="var(--acc)"/><circle cx="20" cy="6" r="3" fill="var(--acc)"/><circle cx="13" cy="20" r="3.4" fill="var(--acc2)"/><path d="M6 7 20 6 13 20Z" fill="none" stroke="var(--acc)" stroke-width="1.6"/></svg>
+  <div><strong>SENTINEL</strong><span>Digital Twin · GÉANT</span></div>
+ </div>
+ <button class="hamburguesa" id="hamburguesa" aria-expanded="false" aria-controls="menuPrincipal">Menú</button>
+ <nav class="menu" id="menuPrincipal" aria-label="Herramientas"></nav>
+ <div class="estadoBarra">
+  <span class="chip" id="chipEscenario" title="Caso de prueba activo">Cargando…</span>
+  <button class="chip" id="chipFallas" title="Ver y quitar las fallas activas">Sin fallas</button>
+ </div>
+</header>
+
+<main class="area" id="area">
+ <section class="panelMapa" aria-label="Mapa de la red">
+  <div class="herramientasMapa">
+   <div class="segmentado" role="group" aria-label="Qué hace un clic en el mapa" id="modoClic">
+    <span>Clic en el mapa:</span>
+    <button data-modo="origen" aria-pressed="true" title="Un clic en un nodo lo vuelve el origen">Origen</button>
+    <button data-modo="destino" aria-pressed="false" title="Un clic en un nodo lo vuelve el destino">Destino</button>
+    <button data-modo="fallar" class="peligro" aria-pressed="false" title="Un clic en un enlace o nodo lo tira (otro clic lo repara)">Provocar falla</button>
+   </div>
+   <div class="zoom" role="group" aria-label="Zoom">
+    <button id="zoomMenos" title="Alejar (tecla -)" aria-label="Alejar">−</button>
+    <button id="zoomMas" title="Acercar (tecla +)" aria-label="Acercar">+</button>
+    <button id="verEuropa" title="Ajustar a Europa">Europa</button>
+    <button id="verTodo" title="Ver toda la red, incluido Nueva York">Toda la red</button>
+   </div>
+  </div>
+  <div class="lienzo" id="lienzo">
+   <svg id="mapa" tabindex="0" role="img" aria-label="Mapa interactivo de la red GÉANT" preserveAspectRatio="xMidYMid meet">
+    <g id="capaEstatica"></g><g id="capaDinamica"></g>
+   </svg>
+   <div id="tooltip" role="status"></div>
+   <div class="leyenda" id="leyenda"></div>
+   <div class="ayudaMapa">Rueda o pellizco: zoom · arrastrar: mover</div>
+  </div>
+  <p class="estadoMapa" id="estadoMapa"></p>
  </section>
-</div>
-<div id="side"></div>
+ <aside class="tablero" id="tablero" aria-live="polite"></aside>
 </main>
+<div class="toast" id="toast" role="status"></div>
+
 <script>
 "use strict";
-const TABS = ["Network Explorer","Algorithm Lab","Cybersecurity Console","Scenario Manager"];
-let net = null, overlay = {}, tab = 0, cut = null;
 
-const SVG_TAGS=["line","circle","polygon","polyline","text"];
-function el(tag, attrs, text){const e=SVG_TAGS.includes(tag)?document.createElementNS("http://www.w3.org/2000/svg",tag):document.createElement(tag);for(const k in (attrs||{}))e.setAttribute(k,attrs[k]);if(text!==undefined)e.textContent=text;return e}
-async function run(mode, input){const t=performance.now();const r=await fetch("/api/run",{method:"POST",body:JSON.stringify({mode,input})});const j=await r.json();return {out:j,ms:performance.now()-t}}
+/* =====================================================================
+   1. Estado global y utilidades
+   ===================================================================== */
 
-function inputs(skipLink){
- const links = net.links.filter((l,i)=>i!==skipLink);
- const edges = links.map(l=>[l.u,l.v,l.cost]);
- const flow = []; links.forEach(l=>{flow.push([l.u,l.v,l.capacity]);flow.push([l.v,l.u,l.capacity])});
- return {edges, flow};
-}
-function project(n){const lat0=50*Math.PI/180;const ny=document.getElementById("showNY").checked;
- const lons=net.nodes.filter(x=>ny||x.name!=="ny1.ny").map(x=>x.lon),lats=net.nodes.map(x=>x.lat);
- const minX=Math.min(...lons),maxX=Math.max(...lons),minY=Math.min(...lats),maxY=Math.max(...lats);
- const k=Math.min(640/((maxX-minX)*Math.cos(lat0)),480/(maxY-minY));
- return [30+(n.lon-minX)*Math.cos(lat0)*k, 20+(maxY-n.lat)*k]}
-function drawMap(){
- const svg=document.getElementById("map");svg.textContent="";
- const P=net.nodes.map(project);
- (overlay.cells||[]).forEach(c=>{const pts=c.map(p=>project({lon:p[0],lat:p[1]})).map(p=>p.join(",")).join(" ");svg.appendChild(el("polygon",{points:pts,fill:"var(--cell)","fill-opacity":".10",stroke:"var(--cell)","stroke-width":"1"}))});
- net.links.forEach((l,i)=>{const a=P[l.u],b=P[l.v];const mst=(overlay.mst||[]).some(e=>(e[0]==l.u&&e[1]==l.v)||(e[0]==l.v&&e[1]==l.u));
-  const isCut=cut===i;
-  svg.appendChild(el("line",{x1:a[0],y1:a[1],x2:b[0],y2:b[1],stroke:isCut?"var(--bad)":(mst?"var(--mst)":"var(--line)"),"stroke-width":isCut?3:(mst?3:1.5),"stroke-dasharray":isCut?"6 4":""}))});
- if(overlay.route){const pts=overlay.route.map(i=>P[i].join(",")).join(" ");svg.appendChild(el("polyline",{points:pts,fill:"none",stroke:"var(--route)","stroke-width":2.5,"stroke-linejoin":"round"}))}
- net.nodes.forEach((n,i)=>{const hi=(overlay.mark||[]).includes(i);
-  svg.appendChild(el("circle",{cx:P[i][0],cy:P[i][1],r:hi?7:5,fill:hi?"var(--route)":"var(--acc)"}));
-  svg.appendChild(el("text",{x:P[i][0]+8,y:P[i][1]-6,"font-size":"11",fill:"var(--ink)"},n.name.split(".")[0]))});
- document.getElementById("mapNote").textContent=overlay.note||"";
- document.getElementById("nyBox").classList.toggle("hide",!net.nodes.some(n=>n.name==="ny1.ny"));
-}
+// Todo lo que la pagina recuerda vive aqui. Las fallas, el origen y el destino son globales:
+// cualquier herramienta los toma en cuenta, asi se puede preguntar "que pasa si falla esto".
+const estado = {
+	red: null,
+	escenarios: [],
+	herramienta: "explorar",
+	origen: 0,
+	destino: 1,
+	enlacesCaidos: new Set(),
+	nodosCaidos: new Set(),
+	modoClic: "origen",
+	capa: {},
+	vista: null,
+	vistaReferencia: null,
+	proyeccion: [],
+	parametrosProyeccion: null,
+	recalcular: null,
+	animacion: null
+};
 
-function renderTabs(){const nav=document.getElementById("tabs");nav.textContent="";TABS.forEach((t,i)=>{const b=el("button",{class:i===tab?"on":""},t);b.onclick=()=>{tab=i;overlay={};cut=null;renderTabs();render()};nav.appendChild(b)})}
-function nodeSelect(id,def){const s=el("select",{id});const pick=(typeof def==="number")?def:net.nodes.findIndex(n=>n.name===def);net.nodes.forEach((n,i)=>{const o=el("option",{value:i},n.name);if(i===pick)o.selected=true;s.appendChild(o)});return s}
-function field(side,label,node){side.appendChild(el("label",{},label));side.appendChild(node)}
-function result(side){const r=el("div",{id:"res"});side.appendChild(r);return r}
-function showJSON(box,title,obj,ms){box.textContent="";box.appendChild(el("p",{},title+(ms?"  ("+ms.toFixed(1)+" ms, incluye ida y vuelta al programa)":"")));box.appendChild(el("pre",{},JSON.stringify(obj,null,1).slice(0,4000)))}
+const PAISES = {at: "Austria", be: "Bélgica", ch: "Suiza", cz: "Chequia", de: "Alemania", es: "España",
+	fr: "Francia", gr: "Grecia", hr: "Croacia", hu: "Hungría", ie: "Irlanda", il: "Israel", it: "Italia",
+	lu: "Luxemburgo", nl: "Países Bajos", ny: "Nueva York", pl: "Polonia", pt: "Portugal", se: "Suecia",
+	si: "Eslovenia", sk: "Eslovaquia", uk: "Reino Unido"};
 
-function renderExplorer(side){
- const s=el("section");s.appendChild(el("h2",{},"Network Explorer"));
- s.appendChild(el("p",{},net.nodes.length+" nodos, "+net.links.length+" enlaces, "+net.demands+" demandas cargadas."));
- if(net.demands===0)s.appendChild(el("p",{class:"note bad"},"Falta app/data/demands.txt (matriz de tráfico de SNDlib). Sin ella no hay carga por nodo ni consola de ciberseguridad."));
- const t=el("table");t.appendChild(el("tr")).append(el("th",{},"Nodo"),el("th",{},"Tráfico (Mbit/s)"));
- [...net.nodes].sort((a,b)=>b.load-a.load).slice(0,10).forEach(n=>{const r=el("tr");r.append(el("td",{},n.name),el("td",{},n.load.toFixed(0)));t.appendChild(r)});
- s.appendChild(el("h2",{},"Top 10 por tráfico"));s.appendChild(t);side.appendChild(s);
- overlay={note:"Cada punto es un nodo de la red; las líneas son enlaces de 40 Gbit/s."};
+const ETIQUETAS_SVG = ["svg", "g", "line", "circle", "polygon", "polyline", "text", "path", "rect", "title"];
+
+// Crea un elemento HTML o SVG con sus atributos y, opcionalmente, su texto.
+function crear(etiqueta, atributos, texto) {
+	const esSvg = ETIQUETAS_SVG.includes(etiqueta);
+	const elemento = esSvg ? document.createElementNS("http://www.w3.org/2000/svg", etiqueta) : document.createElement(etiqueta);
+	for (const clave in (atributos || {})) {
+		if (atributos[clave] !== undefined && atributos[clave] !== null) {
+			elemento.setAttribute(clave, atributos[clave]);
+		}
+	}
+	if (texto !== undefined) {
+		elemento.textContent = texto;
+	}
+	return elemento;
 }
 
-const TECH={mst:["","prim"],tsp:["","heldkarp","2opt","nn"],maxflow:["","edmondskarp"],voronoi:["","sorted"]};
-function renderLab(side){
- const s=el("section");s.appendChild(el("h2",{},"Algorithm Laboratory"));
- const mode=el("select",{id:"mode"});[["mst","MST (Kruskal / Prim)"],["tsp","TSP (ruta de mantenimiento)"],["maxflow","Flujo máximo (Dinic / Edmonds-Karp)"],["voronoi","Voronoi (cobertura)"]].forEach(m=>mode.appendChild(el("option",{value:m[0]},m[1])));
- field(s,"Problema",mode);
- const tech=el("select",{id:"tech"});field(s,"Técnica (vacío = la de por defecto)",tech);
- const fl=el("div",{id:"fl"});
- const fill=()=>{tech.textContent="";TECH[mode.value].forEach(t=>tech.appendChild(el("option",{value:t},t||"por defecto")));fl.classList.toggle("hide",mode.value!=="maxflow")};
- fl.append(el("label",{},"Origen"),nodeSelect("src",net.source),el("label",{},"Destino"),nodeSelect("dst",net.sink));s.appendChild(fl);
- mode.onchange=fill;fill();
- const b=el("button",{class:"run"},"Ejecutar");const c=el("button",{class:"run alt"},"Comparar todas las técnicas");s.append(b,c);
- const box=result(s);
- async function once(tech){
-  const m=mode.value,I=inputs(-1);let input;
-  if(m==="mst")input={edges:I.edges};
-  if(m==="tsp")input={n:net.nodes.length,edges:I.edges};
-  if(m==="maxflow")input={n:net.nodes.length,edges:I.flow,source:+document.getElementById("src").value,sink:+document.getElementById("dst").value};
-  if(m==="voronoi"){const lo=net.nodes.map(n=>n.lon),la=net.nodes.map(n=>n.lat);input={sites:net.nodes.map(n=>[n.lon,n.lat]),bounds:[Math.min(...lo)-3,Math.min(...la)-3,Math.max(...lo)+3,Math.max(...la)+3]}}
-  if(tech)input.algorithm=tech;
-  return run(m,input)}
- b.onclick=async()=>{const {out,ms}=await once(tech.value);overlay={};const m=mode.value;
-  if(out.error){showJSON(box,"Error",out);return}
-  if(m==="mst"){overlay.mst=out.edges;const total=out.edges.reduce((a,e)=>a+e[2],0);overlay.note="Árbol de expansión mínima en verde: "+out.edges.length+" enlaces, costo total "+total+".";showJSON(box,"Costo total "+total,out,ms)}
-  if(m==="tsp"){overlay.route=out.route;overlay.note="Ruta de mantenimiento en naranja ("+(out.algorithm)+"), costo "+(out.cost!==undefined?out.cost:"?")+".";showJSON(box,"Algoritmo: "+out.algorithm,out,ms)}
-  if(m==="maxflow"){overlay.mark=[+document.getElementById("src").value,+document.getElementById("dst").value];overlay.note="Flujo máximo entre los nodos marcados: "+out.maxFlow+" Mbit/s.";showJSON(box,"Flujo máximo "+out.maxFlow+" Mbit/s",out,ms)}
-  if(m==="voronoi"){overlay.cells=out.cells;overlay.note="Zona de cobertura de cada nodo (celdas de Voronoi sobre longitud/latitud).";showJSON(box,"Celdas: "+out.cells.length,out,ms)}
-  drawMap()};
- c.onclick=async()=>{box.textContent="";const t=el("table");t.appendChild(el("tr")).append(el("th",{},"Técnica"),el("th",{},"Tiempo (ms)"),el("th",{},"Resultado"));
-  for(const x of TECH[mode.value]){const {out,ms}=await once(x);const r=el("tr");const v=out.maxFlow!==undefined?out.maxFlow:(out.cost!==undefined?out.cost:(out.edges?out.edges.reduce((a,e)=>a+e[2],0):(out.cells?out.cells.length+" celdas":"?")));r.append(el("td",{},x||"por defecto"),el("td",{},ms.toFixed(1)),el("td",{},String(v)));t.appendChild(r)}
-  box.appendChild(t);box.appendChild(el("p",{class:"note"},"Tamaño de la red: 22 nodos. Para comparar con grafos grandes usa results/benchmarks.md."))};
- side.appendChild(s);overlay={};
+// Unico punto donde la pagina habla con el programa en C++.
+async function ejecutar(modo, entrada) {
+	const inicio = performance.now();
+	try {
+		const respuesta = await fetch("/api/run", {method: "POST", body: JSON.stringify({mode: modo, input: entrada})});
+		const salida = await respuesta.json();
+		return {salida, ms: performance.now() - inicio};
+	} catch (error) {
+		return {salida: {error: "No se pudo hablar con el servidor: " + error.message}, ms: 0};
+	}
 }
 
-function marked(text,ranges){let out=[],pos=0;ranges.slice().sort((a,b)=>a[0]-b[0]).forEach(([a,b])=>{if(a>pos)out.push(document.createTextNode(text.slice(pos,a-1)));out.push(el("mark",{},text.slice(a-1,b)));pos=b});out.push(document.createTextNode(text.slice(pos)));return out}
-function renderCyber(side){
- const s=el("section");s.appendChild(el("h2",{},"Cybersecurity Console"));
- s.appendChild(el("p",{class:"note"},(net.scenario&&net.scenario.id==="03_ejemplo_oficial")?"Transmisiones y firmas del ejemplo oficial de la página. Sirven para comprobar a mano que el programa da los valores esperados.":"Las transmisiones se generan con la matriz de tráfico de GÉANT: cada demanda se codifica en hexadecimal. Puedes editarlas, y en Scenario Manager puedes cargar otro caso."));
- const sig=el("textarea",{id:"sig"});sig.value=(net.signatures||[]).join("\n");
- const t1=el("textarea",{id:"t1"}),t2=el("textarea",{id:"t2"});t1.value=net.payloads[0]||"";t2.value=net.payloads[1]||"";
- field(s,"Firmas de malware (una por línea)",sig);field(s,"Transmisión 1",t1);field(s,"Transmisión 2",t2);
- const b=el("button",{class:"run"},"Analizar");s.appendChild(b);const box=result(s);
- b.onclick=async()=>{const tx=[t1.value,t2.value];box.textContent="";
-  const m=await run("matching",{signatures:sig.value.split("\n").map(x=>x.trim()).filter(Boolean),transmissions:tx});
-  const p=await run("palindrome",{transmissions:tx});const c=await run("commonsubstr",{transmissions:tx});
-  box.appendChild(el("h2",{},"Firmas: primera posición de cada una"));
-  const firmas=sig.value.split("\n").map(x=>x.trim()).filter(Boolean);const pos=m.out.positions||[];
-  const tf=el("table");tf.appendChild(el("tr")).append(el("th",{},"Firma"),el("th",{},"Transmisión 1"),el("th",{},"Transmisión 2"));
-  const celda=r=>!r?"?":(r.found?("sí, posición "+r.position):"no aparece");
-  firmas.forEach((f,i)=>{const tr=el("tr");tr.append(el("td",{},f),el("td",{class:(pos[i]||{}).found?"ok":"bad"},celda(pos[i])),el("td",{class:(pos[firmas.length+i]||{}).found?"ok":"bad"},celda(pos[firmas.length+i])));tf.appendChild(tr)});
-  box.appendChild(tf);
-  box.appendChild(el("p",{class:"note"},"Son seis resultados: las tres firmas en la transmisión 1 y luego en la 2, como pide la página."));
-  box.appendChild(el("h2",{},"Palíndromo más largo"));
-  tx.forEach((x,i)=>{const r=(p.out.ranges||[])[i];const d=el("div",{class:"seq"});if(r)marked(x.replace(/\s/g,"").toUpperCase(),[r]).forEach(n=>d.appendChild(n));box.appendChild(d);box.appendChild(el("p",{class:"note"},"Transmisión "+(i+1)+": posiciones "+(r?r.join("–"):"?")))});
-  box.appendChild(el("h2",{},"Subcadena común más larga"));const r=c.out.range;box.appendChild(el("p",{},r?("posiciones "+r.join("–")+" en la transmisión 1 ("+(c.out.length||"")+" caracteres)"):JSON.stringify(c.out)));
-  tx.forEach(x=>{const d=el("div",{class:"seq"});if(r)marked(x.replace(/\s/g,"").toUpperCase(),[r]).forEach(n=>d.appendChild(n));box.appendChild(d)})};
- side.appendChild(s);overlay={note:"La consola trabaja sobre las transmisiones, no sobre el mapa."};
+function nombreCorto(i) {
+	return estado.red.nodes[i].name.split(".")[0];
 }
 
-function renderScenario(side){
- const sc=el("section");sc.appendChild(el("h2",{},"Scenario Manager — casos de prueba"));
- sc.appendChild(el("p",{class:"note"},"Al cargar un caso, toda la aplicación (mapa, laboratorio y consola) pasa a trabajar con esos datos."));
- const sel=el("select",{id:"scen"});scenarios.forEach(e=>{const o=el("option",{value:e.id},e.nombre);if(e.id===current)o.selected=true;sel.appendChild(o)});
- field(sc,"Caso de prueba",sel);
- const info=el("div");const pinta=()=>{const e=scenarios.find(x=>x.id===sel.value)||{};info.textContent="";info.appendChild(el("p",{class:"note"},e.descripcion||""));info.appendChild(el("p",{class:"note"},"Fuente: "+(e.fuente||"—")))};
- sel.onchange=pinta;pinta();sc.appendChild(info);
- const carga=el("button",{class:"run"},"Cargar caso");sc.appendChild(carga);
- const resumen=el("div");sc.appendChild(resumen);
- const pintaResumen=()=>{resumen.textContent="";const t=el("table");t.appendChild(el("tr")).append(el("th",{},"Propiedad"),el("th",{},"Valor"));
-  [["Nodos",net.nodes.length],["Enlaces",net.links.length],["Demandas",net.demands],["Transmisiones",(net.payloads||[]).length],["Firmas",(net.signatures||[]).join(", ")]].forEach(r=>{const tr=el("tr");r.forEach(x=>tr.appendChild(el("td",{},String(x))));t.appendChild(tr)});
-  resumen.appendChild(t)};
- pintaResumen();
- carga.onclick=async()=>{carga.textContent="Cargando...";await loadScenario(sel.value);carga.textContent="Cargar caso";render()};
- side.appendChild(sc);
- const s=el("section");s.appendChild(el("h2",{},"Simulación: caída de un enlace"));
- const ls=el("select",{id:"cut"});net.links.forEach((l,i)=>ls.appendChild(el("option",{value:i},net.nodes[l.u].name+" – "+net.nodes[l.v].name)));
- field(s,"Enlace que deja de funcionar",ls);
- const fl=el("div");fl.append(el("label",{},"Flujo desde"),nodeSelect("ssrc",net.source),el("label",{},"hasta"),nodeSelect("sdst",net.sink));s.appendChild(fl);
- const b=el("button",{class:"run"},"Simular caída");s.appendChild(b);const box=result(s);
- b.onclick=async()=>{const i=+ls.value;cut=i;const n=net.nodes.length,A=inputs(-1),B=inputs(i);
-  const src=+document.getElementById("ssrc").value,dst=+document.getElementById("sdst").value;
-  const q=async I=>({mst:(await run("mst",{edges:I.edges})).out,flow:(await run("maxflow",{n,edges:I.flow,source:src,sink:dst})).out});
-  const a=await q(A),d=await q(B);const cost=o=>o.mst.edges.reduce((x,e)=>x+e[2],0);
-  const conn=o=>o.mst.edges.length===n-1;
-  const t=el("table");t.appendChild(el("tr")).append(el("th",{},""),el("th",{},"Antes"),el("th",{},"Sin el enlace"));
-  const rows=[["Red conectada",conn(a)?"sí":"no",conn(d)?"sí":"no"],["Costo del árbol mínimo",cost(a),cost(d)],["Flujo máximo (Mbit/s)",a.flow.maxFlow,d.flow.maxFlow]];
-  rows.forEach(r=>{const tr=el("tr");r.forEach(x=>tr.appendChild(el("td",{},String(x))));t.appendChild(tr)});
-  box.textContent="";box.appendChild(t);
-  box.appendChild(el("p",{class:"note"},"El flujo máximo es igual al corte mínimo entre los dos nodos. Si baja, el enlace caído formaba parte de ese corte."));
-  overlay={mst:d.mst.edges,mark:[src,dst],note:"En rojo: enlace caído. En verde: árbol mínimo que queda sin él."};drawMap()};
- const rk=el("button",{class:"run alt"},"Buscar enlaces críticos");s.appendChild(rk);
- rk.onclick=async()=>{const n=net.nodes.length,src=+document.getElementById("ssrc").value,dst=+document.getElementById("sdst").value;
-  box.textContent="Calculando "+net.links.length+" escenarios con el programa en C++...";
-  const base=inputs(-1);const f0=(await run("maxflow",{n,edges:base.flow,source:src,sink:dst})).out.maxFlow;
-  const c0=(await run("mst",{edges:base.edges})).out.edges.reduce((a,e)=>a+e[2],0);
-  const filas=[];
-  for(let i=0;i<net.links.length;i++){const I=inputs(i);
-   const f=(await run("maxflow",{n,edges:I.flow,source:src,sink:dst})).out.maxFlow;
-   const m=(await run("mst",{edges:I.edges})).out.edges;
-   const conectada=m.length===n-1;filas.push({i,perdida:f0-f,conectada,costo:conectada?m.reduce((a,e)=>a+e[2],0)-c0:null})}
-  filas.sort((a,b)=>(a.conectada===b.conectada?0:(a.conectada?1:-1))||b.perdida-a.perdida||(b.costo||0)-(a.costo||0));
-  const t=el("table");t.appendChild(el("tr")).append(el("th",{},"Enlace"),el("th",{},"Flujo perdido"),el("th",{},"Conectada"),el("th",{},"Costo extra MST"));
-  filas.slice(0,8).forEach(r=>{const tr=el("tr");const l=net.links[r.i];tr.append(el("td",{},net.nodes[l.u].name+" – "+net.nodes[l.v].name),el("td",{},r.perdida+" Mbit/s"),el("td",{class:r.conectada?"ok":"bad"},r.conectada?"sí":"NO"),el("td",{},r.costo===null?"—":"+"+r.costo));
-   tr.style.cursor="pointer";tr.onclick=()=>{ls.value=r.i;b.onclick()};t.appendChild(tr)});
-  box.textContent="";box.appendChild(el("p",{},"Flujo base "+f0+" Mbit/s. Enlaces cuya caída más daña la red (clic en una fila para simularla):"));box.appendChild(t)};
- side.appendChild(s);overlay={};
+function nombreLargo(i) {
+	const partes = estado.red.nodes[i].name.split(".");
+	const pais = PAISES[partes[1]];
+	return pais ? pais + " (" + partes[0] + ")" : estado.red.nodes[i].name;
 }
 
-function render(){const side=document.getElementById("side");side.textContent="";
- [renderExplorer,renderLab,renderCyber,renderScenario][tab](side);drawMap()}
+function formatoMs(valor) {
+	return valor.toFixed(valor < 10 ? 2 : 1) + " ms";
+}
 
-let scenarios=[], current="";
-async function loadScenario(id){const q=id?("?scenario="+encodeURIComponent(id)):"";net=await (await fetch("/api/network"+q)).json();current=net.scenario.id;document.getElementById("activeScenario").textContent=net.scenario.nombre;overlay={};cut=null}
-(async()=>{scenarios=await (await fetch("/api/scenarios")).json();await loadScenario("");document.getElementById("showNY").onchange=drawMap;renderTabs();render()})();
+function formatoMiles(valor) {
+	return Math.round(valor).toLocaleString("es-MX");
+}
+
+function avisar(texto) {
+	const toast = document.getElementById("toast");
+	toast.textContent = texto;
+	toast.classList.add("ver");
+	clearTimeout(avisar.temporizador);
+	avisar.temporizador = setTimeout(() => toast.classList.remove("ver"), 3200);
+}
+
+function leerColor(variable) {
+	return getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
+}
+
+// Mezcla dos colores hexadecimales; t va de 0 (primero) a 1 (segundo).
+function mezclarColor(colorUno, colorDos, t) {
+	const uno = parseInt(colorUno.slice(1), 16);
+	const dos = parseInt(colorDos.slice(1), 16);
+	const canal = desplazamiento => Math.round(((uno >> desplazamiento) & 255) * (1 - t) + ((dos >> desplazamiento) & 255) * t);
+	return "rgb(" + canal(16) + "," + canal(8) + "," + canal(0) + ")";
+}
+
+/* =====================================================================
+   2. Fallas y armado de entradas para el C++
+   ===================================================================== */
+
+function enlaceActivo(i) {
+	const enlace = estado.red.links[i];
+	return !estado.enlacesCaidos.has(i) && !estado.nodosCaidos.has(enlace.u) && !estado.nodosCaidos.has(enlace.v);
+}
+
+function indicesNodosActivos() {
+	return estado.red.nodes.map((n, i) => i).filter(i => !estado.nodosCaidos.has(i));
+}
+
+function indicesEnlacesActivos() {
+	return estado.red.links.map((l, i) => i).filter(enlaceActivo);
+}
+
+function hayFallas() {
+	return estado.enlacesCaidos.size + estado.nodosCaidos.size > 0;
+}
+
+// Traduce una arista de la respuesta del C++ ([u, v, ...]) al indice del enlace en el mapa.
+function buscadorDeEnlaces(indices) {
+	const porPar = new Map();
+	indices.forEach(i => {
+		const enlace = estado.red.links[i];
+		const clave = Math.min(enlace.u, enlace.v) + "-" + Math.max(enlace.u, enlace.v);
+		if (!porPar.has(clave)) {
+			porPar.set(clave, []);
+		}
+		porPar.get(clave).push(i);
+	});
+	return (u, v) => {
+		const lista = porPar.get(Math.min(u, v) + "-" + Math.max(u, v)) || [];
+		return lista.length ? lista.shift() : -1;
+	};
+}
+
+function entradaFlujo(origen, destino, enlacesExtraCaidos) {
+	const extra = enlacesExtraCaidos || new Set();
+	return {
+		n: estado.red.nodes.length,
+		edges: estado.red.links.map((l, i) => [l.u, l.v, (enlaceActivo(i) && !extra.has(i)) ? l.capacity : 0]),
+		directed: false,
+		source: origen,
+		sink: destino
+	};
+}
+
+function entradaPropagacion(opciones, conFallas, enlacesExtraCaidos) {
+	const caidos = conFallas ? [...estado.enlacesCaidos] : [];
+	(enlacesExtraCaidos ? [...enlacesExtraCaidos] : []).forEach(i => caidos.push(i));
+	const entrada = {
+		n: estado.red.nodes.length,
+		edges: estado.red.links.map(l => [l.u, l.v, l.cost]),
+		delays: estado.red.links.map(l => l.delay),
+		hopDelay: opciones.procesamiento,
+		metric: opciones.metrica,
+		algorithm: opciones.tecnica,
+		source: opciones.origen,
+		failedLinks: caidos,
+		failedNodes: conFallas ? [...estado.nodosCaidos] : []
+	};
+	if (opciones.destino !== null && opciones.destino !== undefined) {
+		entrada.target = opciones.destino;
+	}
+	return entrada;
+}
+
+function alternarFallaEnlace(i) {
+	const enlace = estado.red.links[i];
+	const texto = nombreCorto(enlace.u) + " – " + nombreCorto(enlace.v);
+	if (estado.enlacesCaidos.has(i)) {
+		estado.enlacesCaidos.delete(i);
+		avisar("Enlace reparado: " + texto);
+	} else {
+		estado.enlacesCaidos.add(i);
+		avisar("Enlace caído: " + texto);
+	}
+	alCambiarFallas();
+}
+
+function alternarFallaNodo(i) {
+	if (estado.nodosCaidos.has(i)) {
+		estado.nodosCaidos.delete(i);
+		avisar("Nodo reparado: " + nombreLargo(i));
+	} else {
+		estado.nodosCaidos.add(i);
+		avisar("Nodo caído: " + nombreLargo(i));
+	}
+	alCambiarFallas();
+}
+
+function limpiarFallas() {
+	estado.enlacesCaidos.clear();
+	estado.nodosCaidos.clear();
+	alCambiarFallas();
+}
+
+function alCambiarFallas() {
+	actualizarChipFallas();
+	if (estado.recalcular) {
+		estado.recalcular();
+	}
+	if (estado.herramienta === "fallas") {
+		mostrarHerramienta("fallas");
+	}
+	pedirDibujo();
+}
+
+function actualizarChipFallas() {
+	const chip = document.getElementById("chipFallas");
+	const total = estado.enlacesCaidos.size + estado.nodosCaidos.size;
+	chip.textContent = total ? ("Fallas activas: " + total) : "Sin fallas";
+	chip.classList.toggle("alerta", total > 0);
+}
+
+/* =====================================================================
+   3. Proyeccion, vista y zoom del mapa
+   ===================================================================== */
+
+// Proyeccion equirectangular corregida por la latitud media: suficiente para Europa.
+function calcularProyeccion() {
+	const nodos = estado.red.nodes;
+	const latitudMedia = nodos.reduce((suma, n) => suma + n.lat, 0) / nodos.length;
+	const coseno = Math.cos(latitudMedia * Math.PI / 180);
+	const xs = nodos.map(n => n.lon * coseno);
+	const ys = nodos.map(n => -n.lat);
+	const minX = Math.min(...xs);
+	const minY = Math.min(...ys);
+	const ancho = Math.max(...xs) - minX || 1;
+	const escala = 1000 / ancho;
+	estado.parametrosProyeccion = {coseno, minX, minY, escala};
+	estado.proyeccion = nodos.map(n => proyectar(n.lon, n.lat));
+}
+
+function proyectar(lon, lat) {
+	const p = estado.parametrosProyeccion;
+	return [(lon * p.coseno - p.minX) * p.escala, (-lat - p.minY) * p.escala];
+}
+
+function cajaDe(indices) {
+	const puntos = indices.map(i => estado.proyeccion[i]);
+	const minX = Math.min(...puntos.map(p => p[0]));
+	const maxX = Math.max(...puntos.map(p => p[0]));
+	const minY = Math.min(...puntos.map(p => p[1]));
+	const maxY = Math.max(...puntos.map(p => p[1]));
+	return {minX, maxX, minY, maxY};
+}
+
+// Ajusta la vista a un conjunto de nodos, respetando la proporcion del recuadro del mapa.
+function ajustarVista(indices) {
+	const svg = document.getElementById("mapa");
+	const proporcion = (svg.clientWidth || 800) / (svg.clientHeight || 500);
+	const caja = cajaDe(indices.length ? indices : estado.red.nodes.map((n, i) => i));
+	let ancho = Math.max(caja.maxX - caja.minX, 40);
+	let alto = Math.max(caja.maxY - caja.minY, 40);
+	const margen = Math.max(ancho, alto) * 0.08 + 20;
+	ancho += 2 * margen;
+	alto += 2 * margen;
+	if (ancho / alto < proporcion) {
+		ancho = alto * proporcion;
+	} else {
+		alto = ancho / proporcion;
+	}
+	const centroX = (caja.minX + caja.maxX) / 2;
+	const centroY = (caja.minY + caja.maxY) / 2;
+	estado.vista = {x: centroX - ancho / 2, y: centroY - alto / 2, w: ancho, h: alto};
+	aplicarVista();
+}
+
+function indicesEuropa() {
+	return estado.red.nodes.map((n, i) => i).filter(i => estado.red.nodes[i].lon > -30);
+}
+
+function verEuropa() {
+	ajustarVista(indicesEuropa());
+	estado.vistaReferencia = {...estado.vista};
+}
+
+function aplicarVista() {
+	const v = estado.vista;
+	document.getElementById("mapa").setAttribute("viewBox", v.x + " " + v.y + " " + v.w + " " + v.h);
+	pedirDibujo();
+}
+
+// Cuantas unidades del mapa mide un pixel de pantalla con el zoom actual.
+function pixel() {
+	const svg = document.getElementById("mapa");
+	return estado.vista.w / (svg.clientWidth || 800);
+}
+
+function zoomEn(factor, x, y) {
+	const v = estado.vista;
+	const referencia = (estado.vistaReferencia || v).w;
+	const nuevoAncho = Math.min(Math.max(v.w / factor, referencia / 25), referencia * 5);
+	const real = v.w / nuevoAncho;
+	v.x = x - (x - v.x) / real;
+	v.y = y - (y - v.y) / real;
+	v.w = nuevoAncho;
+	v.h = v.h / real;
+	aplicarVista();
+}
+
+function zoomAlCentro(factor) {
+	const v = estado.vista;
+	zoomEn(factor, v.x + v.w / 2, v.y + v.h / 2);
+}
+
+function aCoordenadasMapa(clienteX, clienteY) {
+	const svg = document.getElementById("mapa");
+	const punto = new DOMPoint(clienteX, clienteY).matrixTransform(svg.getScreenCTM().inverse());
+	return [punto.x, punto.y];
+}
+
+function alRedimensionar() {
+	if (!estado.vista) {
+		return;
+	}
+	const svg = document.getElementById("mapa");
+	const proporcion = (svg.clientWidth || 800) / (svg.clientHeight || 500);
+	const v = estado.vista;
+	const centroY = v.y + v.h / 2;
+	v.h = v.w / proporcion;
+	v.y = centroY - v.h / 2;
+	aplicarVista();
+}
+
+/* =====================================================================
+   4. Dibujo del mapa
+   ===================================================================== */
+
+let dibujoPendiente = false;
+function pedirDibujo() {
+	if (!dibujoPendiente) {
+		dibujoPendiente = true;
+		requestAnimationFrame(() => {
+			dibujoPendiente = false;
+			dibujarMapa();
+		});
+	}
+}
+
+function linea(capa, a, b, estilo, extra) {
+	const elemento = crear("line", Object.assign({x1: a[0], y1: a[1], x2: b[0], y2: b[1], style: estilo}, extra || {}));
+	capa.appendChild(elemento);
+	return elemento;
+}
+
+// Triangulo en la mitad de un enlace que apunta en el sentido del flujo. El contorno del color
+// del panel hace que se vea aunque este encima de una linea del mismo color.
+function flecha(capa, a, b, color, tamano, contorno) {
+	const mx = (a[0] + b[0]) / 2;
+	const my = (a[1] + b[1]) / 2;
+	const largo = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+	const ux = (b[0] - a[0]) / largo;
+	const uy = (b[1] - a[1]) / largo;
+	const puntas = [[mx + ux * tamano, my + uy * tamano], [mx - ux * tamano * 0.6 - uy * tamano * 0.7, my - uy * tamano * 0.6 + ux * tamano * 0.7], [mx - ux * tamano * 0.6 + uy * tamano * 0.7, my - uy * tamano * 0.6 - ux * tamano * 0.7]];
+	const borde = contorno ? ";stroke:var(--panel);stroke-width:" + contorno + ";stroke-linejoin:round" : "";
+	capa.appendChild(crear("polygon", {points: puntas.map(p => p.join(",")).join(" "), style: "fill:" + color + borde + ";pointer-events:none"}));
+}
+
+function equis(capa, centro, tamano, color) {
+	const t = tamano;
+	linea(capa, [centro[0] - t, centro[1] - t], [centro[0] + t, centro[1] + t], "stroke:" + color + ";stroke-width:" + (t * 0.45) + ";stroke-linecap:round");
+	linea(capa, [centro[0] - t, centro[1] + t], [centro[0] + t, centro[1] - t], "stroke:" + color + ";stroke-width:" + (t * 0.45) + ";stroke-linecap:round");
+}
+
+function estiloEnlace(i, px) {
+	const capa = estado.capa;
+	const caido = !enlaceActivo(i);
+	if (caido) {
+		return {estilo: "stroke:var(--bad);stroke-width:" + 2.6 * px + ";stroke-dasharray:" + 7 * px + " " + 5 * px, color: null};
+	}
+	if (capa.flujo) {
+		const detalle = capa.flujo.porEnlace[i];
+		const uso = detalle && detalle.capacidad > 0 ? Math.abs(detalle.flujo) / detalle.capacidad : 0;
+		if (uso <= 1e-9) {
+			return {estilo: "stroke:var(--enlace);stroke-width:" + 1.4 * px + ";opacity:.55", color: null};
+		}
+		let color = uso >= 0.999 ? leerColor("--saturado") : mezclarColor(leerColor("--flujoBajo"), leerColor("--flujoAlto"), uso);
+		if (capa.flujo.corte.has(i)) {
+			color = leerColor("--corte");
+		}
+		return {estilo: "stroke:" + color + ";stroke-width:" + (2.2 + 6 * uso) * px + ";stroke-linecap:round", color, uso};
+	}
+	if (capa.mst && capa.mst.has(i)) {
+		return {estilo: "stroke:var(--mst);stroke-width:" + 4.5 * px + ";stroke-linecap:round", color: null};
+	}
+	if (capa.criticos && capa.criticos.has(i)) {
+		const peso = capa.criticos.get(i);
+		return {estilo: "stroke:var(--critico);stroke-width:" + (2 + 6 * peso) * px + ";opacity:" + (0.35 + 0.65 * peso), color: null};
+	}
+	if (capa.propagacion && capa.propagacion.arbol.has(i)) {
+		return {estilo: "stroke:var(--alcanzado);stroke-width:" + 1.8 * px + ";opacity:.35", color: null};
+	}
+	return {estilo: "stroke:var(--enlace);stroke-width:" + 1.7 * px, color: null};
+}
+
+function dibujarMapa() {
+	if (!estado.red || !estado.vista) {
+		return;
+	}
+	const capaEstatica = document.getElementById("capaEstatica");
+	capaEstatica.textContent = "";
+	const px = pixel();
+	const P = estado.proyeccion;
+	const capa = estado.capa;
+	const muchos = estado.red.nodes.length > 60;
+
+	// Celdas de Voronoi.
+	(capa.celdas || []).forEach(celda => {
+		const puntos = celda.puntos.map(p => proyectar(p[0], p[1]).join(",")).join(" ");
+		capaEstatica.appendChild(crear("polygon", {points: puntos, style: "fill:var(--celda);fill-opacity:" + (celda.resaltar ? ".22" : ".08") + ";stroke:var(--celda);stroke-width:" + 1.2 * px}));
+	});
+
+	// Ruta del TSP o ruta anterior a la falla (debajo de los enlaces normales).
+	if (capa.rutaFantasma) {
+		const puntos = capa.rutaFantasma.map(i => P[i].join(",")).join(" ");
+		capaEstatica.appendChild(crear("polyline", {points: puntos, style: "fill:none;stroke:var(--mute);stroke-width:" + 5 * px + ";stroke-dasharray:" + 2 * px + " " + 6 * px + ";stroke-linecap:round;opacity:.7"}));
+	}
+
+	// Enlaces: una linea visible y otra transparente y ancha para poder darles clic.
+	const corte = capa.flujo ? capa.flujo.corte : new Set();
+	estado.red.links.forEach((enlace, i) => {
+		const a = P[enlace.u];
+		const b = P[enlace.v];
+		if (corte.has(i)) {
+			linea(capaEstatica, a, b, "stroke:var(--corte);stroke-width:" + 18 * px + ";opacity:.22;stroke-linecap:round");
+		}
+		const {estilo, color, uso} = estiloEnlace(i, px);
+		linea(capaEstatica, a, b, estilo);
+		if (color && uso > 0) {
+			const detalle = capa.flujo.porEnlace[i];
+			const ida = detalle.flujo >= 0;
+			flecha(capaEstatica, ida ? a : b, ida ? b : a, color, (6 + 3 * uso) * px, 1.6 * px);
+		}
+		if (!enlaceActivo(i) && estado.enlacesCaidos.has(i)) {
+			equis(capaEstatica, [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], 5 * px, "var(--bad)");
+		}
+		linea(capaEstatica, a, b, "stroke:transparent;stroke-width:" + 14 * px, {"data-tipo": "enlace", "data-indice": i});
+	});
+
+	if (capa.ruta) {
+		const puntos = capa.ruta.map(i => P[i].join(",")).join(" ");
+		capaEstatica.appendChild(crear("polyline", {points: puntos, style: "fill:none;stroke:var(--ruta);stroke-width:" + 3.4 * px + ";stroke-linejoin:round;stroke-linecap:round;pointer-events:none"}));
+		for (let k = 0; k + 1 < capa.ruta.length; k++) {
+			flecha(capaEstatica, P[capa.ruta[k]], P[capa.ruta[k + 1]], "var(--ruta)", 5 * px);
+		}
+	}
+
+	dibujarNodos(capaEstatica, px, muchos);
+	dibujarCapaDinamica();
+	actualizarLeyenda();
+}
+
+// Acomoda las etiquetas para que no se encimen: prueba ocho posiciones alrededor de cada nodo y
+// se queda con la que menos choca con otras etiquetas y con otros nodos. Si hay simulacion, cada
+// etiqueta reserva dos lineas: el nombre y, debajo, el tiempo de llegada.
+function colocarEtiquetas(px, radios, textos, conTiempo) {
+	const P = estado.proyeccion;
+	const tamano = 11.5 * px;
+	const ocupado = estado.red.nodes.map((n, i) => {
+		const r = radios[i] + 1.5 * px;
+		return [P[i][0] - r, P[i][1] - r, P[i][0] + r, P[i][1] + r];
+	});
+	const choque = (a, b) => Math.max(0, Math.min(a[2], b[2]) - Math.max(a[0], b[0])) * Math.max(0, Math.min(a[3], b[3]) - Math.max(a[1], b[1]));
+	const grado = estado.red.nodes.map(() => 0);
+	estado.red.links.forEach(l => { grado[l.u]++; grado[l.v]++; });
+	const prioridad = i => (i === estado.origen || i === estado.destino ? 1000 : 0) + grado[i];
+	const resultado = {};
+	Object.keys(textos).map(Number).sort((a, b) => prioridad(b) - prioridad(a)).forEach(i => {
+		const p = P[i];
+		const r = radios[i];
+		const ancho = Math.max(textos[i].length, conTiempo ? 7 : 0) * tamano * 0.58 + 2 * px;
+		const alto = tamano * (conTiempo ? 2.2 : 1.2);
+		const separacion = 3 * px;
+		const candidatos = [
+			[p[0] + r + separacion, p[1] - r - alto + tamano * 0.4],
+			[p[0] + r + separacion, p[1] - alto / 2],
+			[p[0] + r + separacion, p[1] + r - tamano * 0.3],
+			[p[0] - r - separacion - ancho, p[1] - r - alto + tamano * 0.4],
+			[p[0] - r - separacion - ancho, p[1] - alto / 2],
+			[p[0] - r - separacion - ancho, p[1] + r - tamano * 0.3],
+			[p[0] - ancho / 2, p[1] - r - separacion - alto],
+			[p[0] - ancho / 2, p[1] + r + separacion]
+		];
+		let mejor = null;
+		let menorChoque = Infinity;
+		candidatos.forEach(([x, y]) => {
+			if (menorChoque > 0) {
+				const caja = [x, y, x + ancho, y + alto];
+				const total = ocupado.reduce((suma, otra, k) => suma + (k === i ? 0 : choque(caja, otra)), 0);
+				if (total < menorChoque) {
+					menorChoque = total;
+					mejor = caja;
+				}
+			}
+		});
+		ocupado.push(mejor);
+		resultado[i] = {x: mejor[0] + px, y1: mejor[1] + tamano * 0.92, y2: mejor[1] + tamano * 2.0};
+	});
+	return resultado;
+}
+
+function radioBase(muchos, px) {
+	return (muchos ? 3 : 5.5) * px;
+}
+
+function dibujarNodos(capaDestino, px, muchos) {
+	const P = estado.proyeccion;
+	const capa = estado.capa;
+	const cargaMaxima = Math.max(1, ...estado.red.nodes.map(n => n.load));
+	const mostrarEtiquetas = !muchos || estado.vista.w < (estado.vistaReferencia || estado.vista).w / 3;
+	const radios = estado.red.nodes.map(nodo => capa.porTrafico ? (muchos ? 2.5 : 4) * px + Math.sqrt(nodo.load / cargaMaxima) * (muchos ? 4 : 9) * px : radioBase(muchos, px));
+	const textos = {};
+	if (mostrarEtiquetas) {
+		estado.red.nodes.forEach((nodo, i) => {
+			let texto = nombreCorto(i);
+			if (capa.mostrarExtremos && i === estado.origen) {
+				texto += " · origen";
+			} else if (capa.mostrarExtremos && capa.usaDestino && i === estado.destino) {
+				texto += " · destino";
+			}
+			textos[i] = texto;
+		});
+	}
+	estado.etiquetas = colocarEtiquetas(px, radios, textos, Boolean(capa.propagacion) && !muchos);
+	estado.red.nodes.forEach((nodo, i) => {
+		const p = P[i];
+		const caido = estado.nodosCaidos.has(i);
+		let radio = radios[i];
+		let estilo = "fill:var(--nodo)";
+		if (capa.porTrafico) {
+			estilo = "fill:var(--acc);fill-opacity:.85";
+		}
+		if (capa.flujo) {
+			estilo = capa.flujo.ladoFuente.has(i) ? "fill:var(--acc)" : "fill:var(--inactivo)";
+		}
+		if (capa.propagacion) {
+			estilo = "fill:var(--inactivo)";
+			if (capa.propagacion.inalcanzables.has(i)) {
+				estilo = "fill:var(--panel);stroke:var(--bad);stroke-width:" + 2.2 * px;
+			}
+		}
+		if (capa.resaltados && capa.resaltados.has(i)) {
+			estilo = "fill:var(--acc2)";
+			radio *= 1.3;
+		}
+		if (caido) {
+			estilo = "fill:var(--inactivo)";
+		}
+		const grupo = crear("g", {"data-tipo": "nodo", "data-indice": i});
+		grupo.appendChild(crear("circle", {cx: p[0], cy: p[1], r: Math.max(radio, 9 * px), style: "fill:transparent"}));
+		grupo.appendChild(crear("circle", {cx: p[0], cy: p[1], r: radio, style: estilo, "data-nodo": i}));
+		if (caido) {
+			equis(grupo, p, radio * 1.15, "var(--bad)");
+		}
+		if (capa.mostrarExtremos && i === estado.origen) {
+			grupo.appendChild(crear("circle", {cx: p[0], cy: p[1], r: radio + 4.5 * px, style: "fill:none;stroke:var(--acc2);stroke-width:" + 3 * px}));
+		}
+		if (capa.mostrarExtremos && capa.usaDestino && i === estado.destino) {
+			grupo.appendChild(crear("circle", {cx: p[0], cy: p[1], r: radio + 4.5 * px, style: "fill:none;stroke:var(--acc2);stroke-width:" + 2 * px + ";stroke-dasharray:" + 3 * px + " " + 2.5 * px}));
+		}
+		const etiqueta = estado.etiquetas[i];
+		if (etiqueta) {
+			grupo.appendChild(crear("text", {x: etiqueta.x, y: etiqueta.y1, style: "font-size:" + 11.5 * px + "px;fill:var(--ink);paint-order:stroke;stroke:var(--mar);stroke-width:" + 3.2 * px + "px;stroke-linejoin:round;pointer-events:none"}, textos[i]));
+		}
+		capaDestino.appendChild(grupo);
+	});
+}
+
+function actualizarLeyenda() {
+	const leyenda = document.getElementById("leyenda");
+	leyenda.textContent = "";
+	const capa = estado.capa;
+	const filas = [];
+	if (capa.flujo) {
+		const usos = capa.flujo.porEnlace.map((d, i) => ({i, uso: d.capacidad > 0 ? Math.abs(d.flujo) / d.capacidad : 0}));
+		if (usos.some(u => u.uso > 1e-9 && u.uso < 0.999)) {
+			filas.push(["gradiente", "Flujo parcial: poco → mucho"]);
+		}
+		if (usos.some(u => u.uso >= 0.999 && !capa.flujo.corte.has(u.i))) {
+			filas.push(["linea", "var(--saturado)", "Enlace lleno (100 %)"]);
+		}
+		if (capa.flujo.corte.size) {
+			filas.push(["linea", "var(--corte)", "Corte mínimo: el cuello de botella"]);
+		}
+		filas.push(["linea", "var(--enlace)", "Enlace sin flujo"]);
+		filas.push(["punto", "var(--acc)", "Lado del origen en el corte"]);
+	}
+	if (capa.mst) {
+		filas.push(["linea", "var(--mst)", "Árbol de expansión mínima"]);
+	}
+	if (capa.ruta) {
+		filas.push(["linea", "var(--ruta)", "Ruta de mantenimiento"]);
+	}
+	if (capa.propagacion) {
+		filas.push(["punto", "var(--paquete)", "Mensaje viajando"]);
+		filas.push(["punto", "var(--alcanzado)", "Nodo que ya lo recibió"]);
+		filas.push(["punto", "var(--inactivo)", "Todavía no lo recibe"]);
+		if (capa.rutaFantasma) {
+			filas.push(["linea", "var(--mute)", "Ruta que usaba antes de la falla"]);
+		}
+	}
+	if (capa.criticos) {
+		filas.push(["linea", "var(--critico)", "Enlace crítico (más grueso = más daño)"]);
+	}
+	if (hayFallas()) {
+		filas.push(["linea", "var(--bad)", "Enlace o nodo caído"]);
+	}
+	filas.forEach(fila => {
+		const div = crear("div");
+		if (fila[0] === "gradiente") {
+			div.appendChild(crear("b", {class: "barraGradiente", style: "background:linear-gradient(90deg,var(--flujoBajo),var(--flujoAlto))"}));
+			div.appendChild(document.createTextNode(fila[1]));
+		} else if (fila[0] === "linea") {
+			div.appendChild(crear("i", {style: "border-color:" + fila[1]}));
+			div.appendChild(document.createTextNode(fila[2]));
+		} else {
+			div.appendChild(crear("b", {class: "punto", style: "background:" + fila[1]}));
+			div.appendChild(document.createTextNode(fila[2]));
+		}
+		leyenda.appendChild(div);
+	});
+}
+
+function ponerEstadoMapa(texto) {
+	document.getElementById("estadoMapa").textContent = texto || "";
+}
+
+/* =====================================================================
+   5. Interaccion con el mapa: clic, arrastre, zoom y tooltip
+   ===================================================================== */
+
+const punteros = new Map();
+let gesto = null;
+
+function objetivoDe(evento) {
+	const elemento = evento.target.closest ? evento.target.closest("[data-tipo]") : null;
+	return elemento ? {tipo: elemento.getAttribute("data-tipo"), indice: +elemento.getAttribute("data-indice")} : null;
+}
+
+function alPresionar(evento) {
+	const svg = document.getElementById("mapa");
+	svg.setPointerCapture(evento.pointerId);
+	punteros.set(evento.pointerId, [evento.clientX, evento.clientY]);
+	if (punteros.size === 1) {
+		gesto = {tipo: "clic", inicio: [evento.clientX, evento.clientY], ultimo: [evento.clientX, evento.clientY], objetivo: objetivoDe(evento)};
+	} else if (punteros.size === 2) {
+		const [a, b] = [...punteros.values()];
+		gesto = {tipo: "pellizco", distancia: Math.hypot(a[0] - b[0], a[1] - b[1])};
+	}
+}
+
+function alMover(evento) {
+	if (!punteros.has(evento.pointerId)) {
+		mostrarTooltip(evento);
+		return;
+	}
+	punteros.set(evento.pointerId, [evento.clientX, evento.clientY]);
+	const svg = document.getElementById("mapa");
+	if (gesto && gesto.tipo === "pellizco" && punteros.size === 2) {
+		const [a, b] = [...punteros.values()];
+		const distancia = Math.hypot(a[0] - b[0], a[1] - b[1]);
+		const centro = aCoordenadasMapa((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+		if (gesto.distancia > 0) {
+			zoomEn(distancia / gesto.distancia, centro[0], centro[1]);
+		}
+		gesto.distancia = distancia;
+	} else if (gesto) {
+		const movido = Math.hypot(evento.clientX - gesto.inicio[0], evento.clientY - gesto.inicio[1]);
+		if (gesto.tipo === "clic" && movido > 5) {
+			gesto.tipo = "arrastre";
+			svg.classList.add("arrastrando");
+			ocultarTooltip();
+		}
+		if (gesto.tipo === "arrastre") {
+			const escala = pixel();
+			estado.vista.x -= (evento.clientX - gesto.ultimo[0]) * escala;
+			estado.vista.y -= (evento.clientY - gesto.ultimo[1]) * escala;
+			gesto.ultimo = [evento.clientX, evento.clientY];
+			aplicarVista();
+		}
+	}
+}
+
+function alSoltar(evento) {
+	const svg = document.getElementById("mapa");
+	punteros.delete(evento.pointerId);
+	svg.classList.remove("arrastrando");
+	if (gesto && gesto.tipo === "clic" && gesto.objetivo && punteros.size === 0) {
+		alHacerClic(gesto.objetivo);
+	}
+	if (punteros.size === 0) {
+		gesto = null;
+	}
+}
+
+function alHacerClic(objetivo) {
+	if (estado.modoClic === "fallar") {
+		if (objetivo.tipo === "enlace") {
+			alternarFallaEnlace(objetivo.indice);
+		} else {
+			alternarFallaNodo(objetivo.indice);
+		}
+	} else if (objetivo.tipo === "nodo") {
+		if (estado.modoClic === "origen") {
+			estado.origen = objetivo.indice;
+			avisar("Origen: " + nombreLargo(objetivo.indice));
+		} else {
+			estado.destino = objetivo.indice;
+			avisar("Destino: " + nombreLargo(objetivo.indice));
+		}
+		sincronizarSelectores();
+		if (estado.recalcular) {
+			estado.recalcular();
+		}
+		pedirDibujo();
+	} else {
+		avisar("Para tirar este enlace, elige «Provocar falla» arriba del mapa");
+	}
+}
+
+function alGirarRueda(evento) {
+	evento.preventDefault();
+	const punto = aCoordenadasMapa(evento.clientX, evento.clientY);
+	zoomEn(Math.exp(-evento.deltaY * 0.0015), punto[0], punto[1]);
+}
+
+function mostrarTooltip(evento) {
+	const objetivo = objetivoDe(evento);
+	const tooltip = document.getElementById("tooltip");
+	if (!objetivo) {
+		ocultarTooltip();
+		return;
+	}
+	tooltip.textContent = "";
+	if (objetivo.tipo === "nodo") {
+		const i = objetivo.indice;
+		const nodo = estado.red.nodes[i];
+		tooltip.appendChild(crear("strong", {}, nombreLargo(i)));
+		tooltip.appendChild(crear("span", {}, "Tráfico: " + formatoMiles(nodo.load) + " Mbit/s"));
+		const grado = estado.red.links.filter(l => l.u === i || l.v === i).length;
+		tooltip.appendChild(crear("span", {}, grado + " enlaces"));
+		const info = estado.capa.propagacion && estado.capa.propagacion.porNodo[i];
+		if (info && info.reachable) {
+			tooltip.appendChild(crear("span", {}, "El mensaje llega en " + formatoMs(info.time) + " (" + info.hops + " saltos)"));
+		}
+		if (estado.nodosCaidos.has(i)) {
+			tooltip.appendChild(crear("span", {class: "bad"}, "Nodo caído"));
+		}
+	} else {
+		const i = objetivo.indice;
+		const enlace = estado.red.links[i];
+		tooltip.appendChild(crear("strong", {}, nombreCorto(enlace.u) + " – " + nombreCorto(enlace.v)));
+		tooltip.appendChild(crear("span", {}, formatoMiles(enlace.capacity) + " Mbit/s · costo " + formatoMiles(enlace.cost)));
+		tooltip.appendChild(crear("span", {}, formatoMiles(enlace.km) + " km · retardo " + formatoMs(enlace.delay)));
+		const detalle = estado.capa.flujo && estado.capa.flujo.porEnlace[i];
+		if (detalle) {
+			tooltip.appendChild(crear("span", {}, "Flujo: " + formatoMiles(Math.abs(detalle.flujo)) + " Mbit/s (" + Math.round(100 * Math.abs(detalle.flujo) / Math.max(detalle.capacidad, 1)) + " %)"));
+		}
+		if (!enlaceActivo(i)) {
+			tooltip.appendChild(crear("span", {class: "bad"}, "Enlace caído"));
+		}
+	}
+	const caja = document.getElementById("lienzo").getBoundingClientRect();
+	let x = evento.clientX - caja.left + 14;
+	let y = evento.clientY - caja.top + 14;
+	tooltip.style.display = "block";
+	if (x + tooltip.offsetWidth > caja.width - 8) {
+		x = evento.clientX - caja.left - tooltip.offsetWidth - 14;
+	}
+	if (y + tooltip.offsetHeight > caja.height - 8) {
+		y = evento.clientY - caja.top - tooltip.offsetHeight - 14;
+	}
+	tooltip.style.left = x + "px";
+	tooltip.style.top = y + "px";
+}
+
+function ocultarTooltip() {
+	document.getElementById("tooltip").style.display = "none";
+}
+
+function prepararMapa() {
+	const svg = document.getElementById("mapa");
+	svg.addEventListener("pointerdown", alPresionar);
+	svg.addEventListener("pointermove", alMover);
+	svg.addEventListener("pointerup", alSoltar);
+	svg.addEventListener("pointercancel", alSoltar);
+	svg.addEventListener("pointerleave", evento => {
+		if (!punteros.size) {
+			ocultarTooltip();
+		}
+	});
+	svg.addEventListener("wheel", alGirarRueda, {passive: false});
+	svg.addEventListener("dblclick", evento => {
+		const punto = aCoordenadasMapa(evento.clientX, evento.clientY);
+		zoomEn(1.8, punto[0], punto[1]);
+	});
+	svg.addEventListener("keydown", evento => {
+		const paso = 40 * pixel();
+		const acciones = {"+": () => zoomAlCentro(1.3), "=": () => zoomAlCentro(1.3), "-": () => zoomAlCentro(1 / 1.3), "0": verEuropa,
+			ArrowLeft: () => { estado.vista.x -= paso; aplicarVista(); }, ArrowRight: () => { estado.vista.x += paso; aplicarVista(); },
+			ArrowUp: () => { estado.vista.y -= paso; aplicarVista(); }, ArrowDown: () => { estado.vista.y += paso; aplicarVista(); }};
+		if (acciones[evento.key]) {
+			evento.preventDefault();
+			acciones[evento.key]();
+		}
+	});
+	document.getElementById("zoomMas").onclick = () => zoomAlCentro(1.4);
+	document.getElementById("zoomMenos").onclick = () => zoomAlCentro(1 / 1.4);
+	document.getElementById("verEuropa").onclick = verEuropa;
+	document.getElementById("verTodo").onclick = () => ajustarVista([]);
+	document.querySelectorAll("#modoClic button").forEach(boton => {
+		boton.onclick = () => {
+			estado.modoClic = boton.getAttribute("data-modo");
+			document.querySelectorAll("#modoClic button").forEach(b => b.setAttribute("aria-pressed", String(b === boton)));
+		};
+	});
+	new ResizeObserver(alRedimensionar).observe(document.getElementById("lienzo"));
+}
+
+/* =====================================================================
+   6. Barra superior y navegacion entre herramientas
+   ===================================================================== */
+
+const MENU = [
+	{grupo: "Red", opciones: [
+		{id: "explorar", titulo: "Explorar la red", detalle: "Nodos, enlaces y tráfico de GÉANT"}
+	]},
+	{grupo: "Algoritmos", opciones: [
+		{id: "mst", titulo: "Árbol de expansión mínima", detalle: "Kruskal y Prim: conectar todo al menor costo"},
+		{id: "tsp", titulo: "Ruta de mantenimiento", detalle: "TSP: visitar todos los nodos y volver"},
+		{id: "flujo", titulo: "Flujo máximo", detalle: "Dinic y Edmonds-Karp, con el flujo pintado en el mapa"},
+		{id: "voronoi", titulo: "Zonas de cobertura", detalle: "Voronoi: qué nodo atiende cada zona"}
+	]},
+	{grupo: "Simulación", opciones: [
+		{id: "propagacion", titulo: "Propagación de un mensaje", detalle: "Salto por salto y con reloj, como Packet Tracer"},
+		{id: "fallas", titulo: "¿Qué pasa si falla…?", detalle: "Impacto de las fallas y enlaces críticos"}
+	]},
+	{grupo: "Ciberseguridad", opciones: [
+		{id: "consola", titulo: "Consola de firmas", detalle: "KMP, Manacher y subcadena común"}
+	]},
+	{grupo: "Escenarios", dinamico: true}
+];
+
+function cerrarMenus() {
+	document.querySelectorAll(".grupo").forEach(grupo => {
+		grupo.classList.remove("abierto");
+		grupo.querySelector(".grupoBoton").setAttribute("aria-expanded", "false");
+	});
+}
+
+function construirMenu() {
+	const nav = document.getElementById("menuPrincipal");
+	nav.textContent = "";
+	MENU.forEach(seccion => {
+		const grupo = crear("div", {class: "grupo"});
+		const boton = crear("button", {class: "grupoBoton", "aria-haspopup": "true", "aria-expanded": "false"});
+		boton.appendChild(document.createTextNode(seccion.grupo));
+		const icono = crear("svg", {viewBox: "0 0 10 10", "aria-hidden": "true"});
+		icono.appendChild(crear("path", {d: "M1 3 5 7 9 3", style: "fill:none;stroke:currentColor;stroke-width:1.6"}));
+		boton.appendChild(icono);
+		const desplegable = crear("div", {class: "desplegable", role: "menu"});
+		const opciones = seccion.dinamico ? opcionesEscenarios() : seccion.opciones;
+		opciones.forEach(opcion => {
+			if (opcion.separador) {
+				desplegable.appendChild(crear("div", {class: "separador"}));
+				return;
+			}
+			const item = crear("button", {class: "opcion" + (opcion.id === estado.herramienta ? " activa" : ""), role: "menuitem"});
+			item.appendChild(document.createTextNode(opcion.titulo));
+			item.appendChild(crear("small", {}, opcion.detalle));
+			item.onclick = () => {
+				cerrarMenus();
+				document.getElementById("barra").classList.remove("menuAbierto");
+				if (opcion.escenario) {
+					cargarEscenario(opcion.escenario);
+				} else {
+					mostrarHerramienta(opcion.id);
+				}
+			};
+			desplegable.appendChild(item);
+		});
+		const contieneActiva = !seccion.dinamico && seccion.opciones.some(o => o.id === estado.herramienta);
+		boton.classList.toggle("activo", contieneActiva);
+		boton.onclick = evento => {
+			evento.stopPropagation();
+			const abierto = grupo.classList.contains("abierto");
+			cerrarMenus();
+			if (!abierto) {
+				grupo.classList.add("abierto");
+				boton.setAttribute("aria-expanded", "true");
+			}
+		};
+		boton.onkeydown = evento => {
+			if (evento.key === "ArrowDown") {
+				evento.preventDefault();
+				grupo.classList.add("abierto");
+				boton.setAttribute("aria-expanded", "true");
+				const primero = desplegable.querySelector(".opcion");
+				if (primero) {
+					primero.focus();
+				}
+			}
+		};
+		desplegable.onkeydown = evento => {
+			const items = [...desplegable.querySelectorAll(".opcion")];
+			const posicion = items.indexOf(document.activeElement);
+			if (evento.key === "ArrowDown" && posicion < items.length - 1) {
+				evento.preventDefault();
+				items[posicion + 1].focus();
+			} else if (evento.key === "ArrowUp") {
+				evento.preventDefault();
+				(posicion > 0 ? items[posicion - 1] : boton).focus();
+			}
+		};
+		grupo.append(boton, desplegable);
+		nav.appendChild(grupo);
+	});
+}
+
+function opcionesEscenarios() {
+	const lista = estado.escenarios.map(e => ({escenario: e.id, titulo: (e.id === (estado.red && estado.red.scenario.id) ? "● " : "") + e.nombre, detalle: e.descripcion.length > 90 ? e.descripcion.slice(0, 88) + "…" : e.descripcion}));
+	lista.push({separador: true});
+	lista.push({id: "escenarios", titulo: "Ver todos los casos de prueba", detalle: "Qué trae cada uno y de dónde salen los datos"});
+	return lista;
+}
+
+/* =====================================================================
+   7. Herramientas del tablero
+   ===================================================================== */
+
+const HERRAMIENTAS = {};
+
+function mostrarHerramienta(id) {
+	detenerAnimacion();
+	estado.herramienta = id;
+	estado.capa = {};
+	estado.recalcular = null;
+	document.getElementById("area").classList.toggle("ancho", id === "consola");
+	const tablero = document.getElementById("tablero");
+	tablero.textContent = "";
+	tablero.scrollTop = 0;
+	ponerEstadoMapa("");
+	(HERRAMIENTAS[id] || HERRAMIENTAS.explorar)(tablero);
+	construirMenu();
+	pedirDibujo();
+	requestAnimationFrame(alRedimensionar);
+}
+
+// Selector de nodo ligado al origen o al destino global: cambiarlo en el tablero o con un clic
+// en el mapa es lo mismo.
+function selectorNodo(cual) {
+	const select = crear("select", {"data-ligado": cual});
+	const orden = estado.red.nodes.map((n, i) => i).sort((a, b) => nombreLargo(a).localeCompare(nombreLargo(b), "es"));
+	orden.forEach(i => select.appendChild(crear("option", {value: i}, nombreLargo(i))));
+	select.value = estado[cual];
+	select.onchange = () => {
+		estado[cual] = +select.value;
+		pedirDibujo();
+		if (estado.recalcular) {
+			estado.recalcular();
+		}
+	};
+	return select;
+}
+
+function sincronizarSelectores() {
+	document.querySelectorAll("select[data-ligado]").forEach(select => {
+		select.value = estado[select.getAttribute("data-ligado")];
+	});
+}
+
+function campo(contenedor, etiqueta, control) {
+	const label = crear("label", {}, etiqueta);
+	contenedor.append(label, control);
+	return control;
+}
+
+function selectorOpciones(opciones, valor) {
+	const select = crear("select");
+	opciones.forEach(([clave, texto]) => select.appendChild(crear("option", {value: clave}, texto)));
+	if (valor !== undefined) {
+		select.value = valor;
+	}
+	return select;
+}
+
+function seccion(tablero, titulo, subtitulo) {
+	const s = crear("section");
+	if (titulo) {
+		s.appendChild(crear("h2", {}, titulo));
+	}
+	if (subtitulo) {
+		s.appendChild(crear("p", {class: "nota"}, subtitulo));
+	}
+	tablero.appendChild(s);
+	return s;
+}
+
+function tabla(encabezados, filas, opciones) {
+	const t = crear("table");
+	const encabezado = crear("tr");
+	encabezados.forEach((h, k) => encabezado.appendChild(crear("th", {class: (opciones && opciones.numericas && opciones.numericas.includes(k)) ? "num" : null}, h)));
+	t.appendChild(encabezado);
+	filas.forEach(fila => {
+		const tr = crear("tr");
+		fila.forEach((valor, k) => {
+			const td = crear("td", {class: (opciones && opciones.numericas && opciones.numericas.includes(k)) ? "num" : null});
+			if (valor instanceof Node) {
+				td.appendChild(valor);
+			} else {
+				td.textContent = valor;
+			}
+			tr.appendChild(td);
+		});
+		t.appendChild(tr);
+	});
+	return t;
+}
+
+function mostrarError(contenedor, salida) {
+	contenedor.textContent = "";
+	contenedor.appendChild(crear("p", {class: "bad"}, "El programa respondió: " + (salida.error || JSON.stringify(salida))));
+}
+
+function notaFallas(contenedor) {
+	if (hayFallas()) {
+		contenedor.appendChild(crear("p", {class: "aviso"}, "Se está calculando con " + (estado.enlacesCaidos.size + estado.nodosCaidos.size) + " falla(s) activa(s). Quítalas desde «Fallas activas» arriba a la derecha."));
+	}
+}
+
+// Ejecuta muchas consultas al programa de pocas en pocas, para no abrir cientos de procesos a la vez.
+async function ejecutarEnLotes(pedidos, tamano) {
+	const respuestas = [];
+	for (let k = 0; k < pedidos.length; k += tamano) {
+		const lote = await Promise.all(pedidos.slice(k, k + tamano).map(p => ejecutar(p.modo, p.entrada)));
+		lote.forEach(r => respuestas.push(r));
+	}
+	return respuestas;
+}
+
+// Corre todas las tecnicas de un modo y muestra tiempo y resultado de cada una.
+async function compararTecnicas(contenedor, tecnicas, armar, resumir) {
+	contenedor.textContent = "Comparando técnicas con el programa en C++…";
+	const filas = [];
+	for (const [clave, nombre] of tecnicas) {
+		const {salida, ms} = await ejecutar(armar.modo, Object.assign({}, armar.entrada(), {algorithm: clave}));
+		filas.push([nombre, salida.error ? "error" : resumir(salida), ms.toFixed(1)]);
+	}
+	contenedor.textContent = "";
+	contenedor.appendChild(crear("h3", {}, "Comparación de técnicas"));
+	contenedor.appendChild(tabla(["Técnica", "Resultado", "Tiempo (ms)"], filas, {numericas: [2]}));
+	contenedor.appendChild(crear("p", {class: "nota"}, "El tiempo incluye ida y vuelta al programa. Con una red de este tamaño casi todo es costo fijo; las diferencias reales se ven en results/benchmarks.md."));
+}
+
+/* ---------- 7.1 Explorar la red ---------- */
+HERRAMIENTAS.explorar = tablero => {
+	const red = estado.red;
+	const s = seccion(tablero, "Explorar la red", red.scenario.descripcion);
+	s.appendChild(crear("p", {class: "nota"}, "Fuente: " + red.scenario.fuente));
+	const enlaceLargo = red.links.reduce((a, b) => (b.km > a.km ? b : a), red.links[0]);
+	const tarjetas = crear("div", {class: "tarjetas"});
+	[[red.nodes.length, "nodos"], [red.links.length, "enlaces"], [formatoMiles(red.demands), "demandas de tráfico"],
+		[formatoMiles(red.links[0].capacity / 1000) + " Gbit/s", "capacidad por enlace"],
+		[formatoMiles(enlaceLargo.km) + " km", "enlace más largo (" + nombreCorto(enlaceLargo.u) + "–" + nombreCorto(enlaceLargo.v) + ")"],
+		[formatoMs(enlaceLargo.delay), "su retardo en fibra"]].forEach(([valor, texto]) => {
+		const t = crear("div", {class: "tarjeta"});
+		t.append(crear("b", {}, String(valor)), crear("span", {}, texto));
+		tarjetas.appendChild(t);
+	});
+	s.appendChild(tarjetas);
+
+	const top = seccion(tablero, null);
+	top.appendChild(crear("h3", {}, "Nodos con más tráfico"));
+	top.appendChild(crear("p", {class: "nota"}, "El tamaño de cada punto en el mapa es proporcional a su tráfico. Clic en una fila para ubicar el nodo."));
+	const orden = red.nodes.map((n, i) => i).sort((a, b) => red.nodes[b].load - red.nodes[a].load).slice(0, 10);
+	const t = tabla(["Nodo", "Tráfico (Mbit/s)"], orden.map(i => [nombreLargo(i), formatoMiles(red.nodes[i].load)]), {numericas: [1]});
+	[...t.querySelectorAll("tr")].slice(1).forEach((tr, k) => {
+		tr.classList.add("clic");
+		tr.onclick = () => {
+			estado.capa.resaltados = new Set([orden[k]]);
+			pedirDibujo();
+		};
+	});
+	top.appendChild(t);
+
+	const ayuda = seccion(tablero, null);
+	ayuda.appendChild(crear("h3", {}, "Cómo usar el gemelo digital"));
+	const lista = crear("ul", {class: "lista"});
+	["La barra de arriba tiene todas las herramientas: algoritmos, simulación, ciberseguridad y casos de prueba.",
+		"Arriba del mapa eliges qué hace un clic: marcar origen, marcar destino o provocar una falla.",
+		"Las fallas son globales: todas las herramientas las toman en cuenta. Así se pregunta «qué pasa si cae este enlace».",
+		"Rueda del mouse, pellizco o los botones + y − para el zoom; arrastra para moverte. Pasa el cursor sobre un nodo o enlace para ver sus datos.",
+		"Ningún resultado se calcula en esta página: todo lo calcula el ejecutable en C++, el mismo que evalúa el autograder."].forEach(texto => lista.appendChild(crear("li", {}, texto)));
+	ayuda.appendChild(lista);
+	estado.capa = {porTrafico: true};
+	ponerEstadoMapa("Cada punto es un nodo de GÉANT y cada línea un enlace de fibra de 40 Gbit/s.");
+};
+
+/* ---------- 7.2 Arbol de expansion minima ---------- */
+HERRAMIENTAS.mst = tablero => {
+	const s = seccion(tablero, "Árbol de expansión mínima", "Conecta todos los nodos usando los enlaces más baratos, sin ciclos. El costo de SNDlib en GÉANT es la distancia en km.");
+	const tecnica = campo(s, "Técnica", selectorOpciones([["kruskal", "Kruskal + Union-Find (por defecto)"], ["prim", "Prim con cola de prioridad"]]));
+	const botones = crear("div", {class: "botones"});
+	const calcular = crear("button", {class: "btn"}, "Calcular");
+	const comparar = crear("button", {class: "btn sec"}, "Comparar técnicas");
+	botones.append(calcular, comparar);
+	s.appendChild(botones);
+	const resultado = crear("div");
+	s.appendChild(resultado);
+	const entrada = () => {
+		const activos = indicesEnlacesActivos();
+		return {nodes: indicesNodosActivos(), edges: activos.map(i => [estado.red.links[i].u, estado.red.links[i].v, estado.red.links[i].cost])};
+	};
+	async function correr() {
+		const {salida, ms} = await ejecutar("mst", Object.assign(entrada(), {algorithm: tecnica.value}));
+		if (salida.error) {
+			mostrarError(resultado, salida);
+			return;
+		}
+		const buscar = buscadorDeEnlaces(indicesEnlacesActivos());
+		estado.capa = {mst: new Set(salida.edges.map(e => buscar(e[0], e[1])))};
+		resultado.textContent = "";
+		resultado.appendChild(crear("p", {class: "grande"}, formatoMiles(salida.totalCost) + " km"));
+		resultado.appendChild(crear("p", {class: "nota"}, "Costo total con " + salida.algorithm + ": " + salida.edges.length + " enlaces de " + indicesEnlacesActivos().length + " disponibles (" + ms.toFixed(1) + " ms)."));
+		resultado.appendChild(crear("p", {class: salida.connected ? "ok" : "bad"}, salida.connected ? "La red queda conectada." : "La red quedó partida: con estas fallas no hay forma de conectar todos los nodos."));
+		notaFallas(resultado);
+		ponerEstadoMapa("En verde: los enlaces del árbol de expansión mínima. Prueba tirar uno con «Provocar falla» y mira cómo se reacomoda.");
+		pedirDibujo();
+	}
+	calcular.onclick = correr;
+	comparar.onclick = () => compararTecnicas(resultado, [["kruskal", "Kruskal"], ["prim", "Prim"]], {modo: "mst", entrada}, salida => formatoMiles(salida.totalCost) + " km");
+	estado.recalcular = correr;
+	correr();
+};
+
+/* ---------- 7.3 Ruta de mantenimiento (TSP) ---------- */
+HERRAMIENTAS.tsp = tablero => {
+	const s = seccion(tablero, "Ruta de mantenimiento", "Recorre todos los nodos y regresa al inicio con el menor costo. Hasta 16 nodos usa el exacto; con más, la aproximación.");
+	const tecnica = campo(s, "Técnica", selectorOpciones([["", "Automática (exacto si n ≤ 16)"], ["heldkarp", "Held-Karp (exacto)"], ["2opt", "Vecino más cercano + 2-opt"], ["nn", "Solo vecino más cercano"]]));
+	const botones = crear("div", {class: "botones"});
+	const calcular = crear("button", {class: "btn"}, "Calcular ruta");
+	const comparar = crear("button", {class: "btn sec"}, "Comparar técnicas");
+	botones.append(calcular, comparar);
+	s.appendChild(botones);
+	const resultado = crear("div");
+	s.appendChild(resultado);
+	const entrada = () => {
+		const activos = indicesEnlacesActivos();
+		return {nodes: indicesNodosActivos(), edges: activos.map(i => [estado.red.links[i].u, estado.red.links[i].v, estado.red.links[i].cost])};
+	};
+	async function correr() {
+		const pedido = entrada();
+		if (tecnica.value) {
+			pedido.algorithm = tecnica.value;
+		}
+		const {salida, ms} = await ejecutar("tsp", pedido);
+		if (salida.error) {
+			estado.capa = {};
+			mostrarError(resultado, salida);
+			resultado.appendChild(crear("p", {class: "nota"}, "Si hay fallas, puede que la red haya quedado partida y ya no exista una ruta que pase por todos."));
+			pedirDibujo();
+			return;
+		}
+		// Dos nodos seguidos de la ruta pueden no tener enlace directo: el C++ completa esas distancias
+		// con Floyd-Warshall. Para dibujar por donde pasa de verdad, se le pide al C++ el camino mas
+		// corto de cada tramo indirecto (modo propagation), y el mapa solo traza enlaces que existen.
+		const directos = new Set(indicesEnlacesActivos().map(i => {
+			const enlace = estado.red.links[i];
+			return Math.min(enlace.u, enlace.v) + "-" + Math.max(enlace.u, enlace.v);
+		}));
+		const tramos = [];
+		for (let k = 0; k + 1 < salida.route.length; k++) {
+			tramos.push([salida.route[k], salida.route[k + 1]]);
+		}
+		const indirectos = tramos.filter(([a, b]) => !directos.has(Math.min(a, b) + "-" + Math.max(a, b)));
+		const caminos = await ejecutarEnLotes(indirectos.map(([a, b]) => ({modo: "propagation", entrada: entradaPropagacion({origen: a, destino: b, metrica: "weight", tecnica: "dijkstra", procesamiento: 0}, true)})), 8);
+		const porTramo = new Map();
+		indirectos.forEach(([a, b], k) => porTramo.set(a + ">" + b, caminos[k].salida.path && caminos[k].salida.path.length ? caminos[k].salida.path : [a, b]));
+		const recorrido = [salida.route[0]];
+		tramos.forEach(([a, b]) => (porTramo.get(a + ">" + b) || [a, b]).slice(1).forEach(x => recorrido.push(x)));
+		estado.capa = {ruta: recorrido};
+		resultado.textContent = "";
+		resultado.appendChild(crear("p", {class: "grande"}, formatoMiles(salida.cost) + " km"));
+		resultado.appendChild(crear("p", {class: "nota"}, "Técnica usada: " + salida.algorithm + " (" + ms.toFixed(1) + " ms)."));
+		resultado.appendChild(crear("h3", {}, "Orden de visita"));
+		resultado.appendChild(crear("p", {}, salida.route.map(nombreCorto).join(" → ")));
+		if (indirectos.length) {
+			resultado.appendChild(crear("p", {class: "nota"}, indirectos.length + " de " + tramos.length + " tramos no tienen enlace directo; en el mapa siguen el camino más corto real, así que el equipo pasa de largo por algunos nodos. En total recorre " + (recorrido.length - 1) + " enlaces."));
+		}
+		notaFallas(resultado);
+		ponerEstadoMapa("En naranja: la ruta de mantenimiento, siempre por enlaces que existen. Las flechas marcan el sentido del recorrido.");
+		pedirDibujo();
+	}
+	calcular.onclick = correr;
+	comparar.onclick = () => compararTecnicas(resultado, [["heldkarp", "Held-Karp"], ["2opt", "Vecino + 2-opt"], ["nn", "Vecino más cercano"]], {modo: "tsp", entrada}, salida => formatoMiles(salida.cost) + " km");
+	estado.recalcular = correr;
+	correr();
+};
+
+/* ---------- 7.4 Flujo maximo, pintado en el mapa ---------- */
+HERRAMIENTAS.flujo = tablero => {
+	const s = seccion(tablero, "Flujo máximo", "Cuántos datos caben del origen al destino sin pasar la capacidad de ningún enlace. El mapa pinta cuánto lleva cada enlace.");
+	const fila = crear("div", {class: "fila"});
+	const izquierda = crear("div");
+	const derecha = crear("div");
+	campo(izquierda, "Origen", selectorNodo("origen"));
+	campo(derecha, "Destino", selectorNodo("destino"));
+	fila.append(izquierda, derecha);
+	s.appendChild(fila);
+	const tecnica = campo(s, "Técnica", selectorOpciones([["dinic", "Dinic (por defecto)"], ["edmondskarp", "Edmonds-Karp"]]));
+	const botones = crear("div", {class: "botones"});
+	const calcular = crear("button", {class: "btn"}, "Calcular flujo");
+	const comparar = crear("button", {class: "btn sec"}, "Comparar técnicas");
+	botones.append(calcular, comparar);
+	s.appendChild(botones);
+	const resultado = crear("div");
+	s.appendChild(resultado);
+	async function correr() {
+		if (estado.origen === estado.destino) {
+			resultado.textContent = "";
+			resultado.appendChild(crear("p", {class: "bad"}, "El origen y el destino son el mismo nodo."));
+			estado.capa = {mostrarExtremos: true, usaDestino: true};
+			pedirDibujo();
+			return;
+		}
+		const {salida, ms} = await ejecutar("maxflow", Object.assign(entradaFlujo(estado.origen, estado.destino), {algorithm: tecnica.value}));
+		if (salida.error) {
+			mostrarError(resultado, salida);
+			return;
+		}
+		estado.capa = {
+			mostrarExtremos: true,
+			usaDestino: true,
+			flujo: {
+				porEnlace: salida.flows.map(f => ({flujo: f[2], capacidad: f[3]})),
+				corte: new Set(salida.minCut.map(c => c[3])),
+				ladoFuente: new Set(salida.sourceSide)
+			}
+		};
+		resultado.textContent = "";
+		resultado.appendChild(crear("p", {class: "grande"}, formatoMiles(salida.maxFlow) + " Mbit/s"));
+		const capacidad = estado.red.links[0].capacity;
+		resultado.appendChild(crear("p", {class: "nota"}, "De " + nombreLargo(estado.origen) + " a " + nombreLargo(estado.destino) + " con " + salida.algorithm + " (" + ms.toFixed(1) + " ms). Equivale a " + (salida.maxFlow / capacidad).toFixed(1).replace(".0", "") + " enlaces de " + formatoMiles(capacidad / 1000) + " Gbit/s llenos."));
+		resultado.appendChild(crear("h3", {}, "Corte mínimo: el cuello de botella"));
+		resultado.appendChild(crear("p", {class: "nota"}, "Estos " + salida.minCut.length + " enlaces suman " + formatoMiles(salida.minCutCapacity) + " Mbit/s, exactamente el flujo máximo. Si se cortan todos, el origen queda separado del destino."));
+		const listaCorte = crear("ul", {class: "lista"});
+		salida.minCut.forEach(c => listaCorte.appendChild(crear("li", {}, nombreLargo(c[0]) + " – " + nombreLargo(c[1]) + " (" + formatoMiles(c[2]) + " Mbit/s)")));
+		resultado.appendChild(listaCorte);
+		const usados = salida.flows.map((f, i) => ({i, flujo: Math.abs(f[2]), capacidad: f[3]})).filter(x => x.flujo > 0).sort((a, b) => b.flujo - a.flujo);
+		resultado.appendChild(crear("h3", {}, "Enlaces que llevan flujo (" + usados.length + ")"));
+		resultado.appendChild(tabla(["Enlace", "Flujo (Mbit/s)", "Uso"], usados.slice(0, 12).map(x => {
+			const enlace = estado.red.links[x.i];
+			return [nombreCorto(enlace.u) + " – " + nombreCorto(enlace.v), formatoMiles(x.flujo), Math.round(100 * x.flujo / x.capacidad) + " %"];
+		}), {numericas: [1, 2]}));
+		notaFallas(resultado);
+		ponerEstadoMapa("Naranja = enlace lleno; morado = corte mínimo; las flechas marcan hacia dónde va el flujo. Prueba tirar un enlace del corte y vuelve a mirar.");
+		pedirDibujo();
+	}
+	calcular.onclick = correr;
+	comparar.onclick = () => compararTecnicas(resultado, [["dinic", "Dinic"], ["edmondskarp", "Edmonds-Karp"]], {modo: "maxflow", entrada: () => entradaFlujo(estado.origen, estado.destino)}, salida => formatoMiles(salida.maxFlow) + " Mbit/s");
+	estado.recalcular = correr;
+	correr();
+};
+
+/* ---------- 7.5 Zonas de cobertura (Voronoi) ---------- */
+HERRAMIENTAS.voronoi = tablero => {
+	const s = seccion(tablero, "Zonas de cobertura", "Cada celda es la zona que queda más cerca de un nodo que de cualquier otro. Si un nodo cae, sus vecinos se reparten su zona.");
+	const tecnica = campo(s, "Técnica", selectorOpciones([["clipping", "Recorte por semiplanos (por defecto)"], ["sorted", "Vecinos ordenados"]]));
+	const botones = crear("div", {class: "botones"});
+	const calcular = crear("button", {class: "btn"}, "Calcular zonas");
+	const comparar = crear("button", {class: "btn sec"}, "Comparar técnicas");
+	botones.append(calcular, comparar);
+	s.appendChild(botones);
+	const resultado = crear("div");
+	s.appendChild(resultado);
+	const entrada = () => {
+		const nodos = estado.red.nodes;
+		const longitudes = nodos.map(n => n.lon);
+		const latitudes = nodos.map(n => n.lat);
+		return {sites: indicesNodosActivos().map(i => [nodos[i].lon, nodos[i].lat]),
+			bounds: [Math.min(...longitudes) - 3, Math.min(...latitudes) - 3, Math.max(...longitudes) + 3, Math.max(...latitudes) + 3]};
+	};
+	async function correr() {
+		const activos = indicesNodosActivos();
+		const {salida, ms} = await ejecutar("voronoi", Object.assign(entrada(), {algorithm: tecnica.value}));
+		if (salida.error) {
+			mostrarError(resultado, salida);
+			return;
+		}
+		estado.capa = {celdas: salida.cells.map((puntos, k) => ({puntos, nodo: activos[k]}))};
+		const areas = salida.regions.map((r, k) => ({nodo: activos[k], area: r.area})).sort((a, b) => b.area - a.area);
+		resultado.textContent = "";
+		resultado.appendChild(crear("p", {class: "grande"}, salida.cells.length + " zonas"));
+		resultado.appendChild(crear("p", {class: "nota"}, "Calculado con " + salida.algorithm + " en " + ms.toFixed(1) + " ms. Las áreas están en grados² de longitud y latitud (sin proyección)."));
+		resultado.appendChild(crear("h3", {}, "Zonas más grandes"));
+		resultado.appendChild(tabla(["Nodo", "Área (grados²)"], areas.slice(0, 8).map(a => [nombreLargo(a.nodo), a.area.toFixed(1)]), {numericas: [1]}));
+		notaFallas(resultado);
+		ponerEstadoMapa("Cada polígono azul es la zona de un nodo. Tira un nodo con «Provocar falla» para ver quién absorbe su zona.");
+		pedirDibujo();
+	}
+	calcular.onclick = correr;
+	comparar.onclick = () => compararTecnicas(resultado, [["clipping", "Recorte directo"], ["sorted", "Vecinos ordenados"]], {modo: "voronoi", entrada}, salida => salida.cells.length + " zonas");
+	estado.recalcular = correr;
+	correr();
+};
+
+/* ---------- 7.6 Propagacion de un mensaje (estilo Packet Tracer) ---------- */
+const MS_REALES_POR_MS_SIMULADO = 160;
+const VELOCIDADES = [0.25, 0.5, 1, 2, 4, 8];
+
+HERRAMIENTAS.propagacion = tablero => {
+	const s = seccion(tablero, "Propagación de un mensaje", "Sale un mensaje del origen y viaja salto por salto. El tiempo es real: la distancia del enlace entre la velocidad de la luz en la fibra (200 km por ms) más el procesamiento de cada router.");
+	const tipo = crear("div", {class: "segmentado", role: "group", "aria-label": "Tipo de mensaje"});
+	const difusion = crear("button", {"aria-pressed": "true"}, "A toda la red");
+	const unicast = crear("button", {"aria-pressed": "false"}, "A un destino");
+	tipo.append(difusion, unicast);
+	s.appendChild(crear("label", {}, "Tipo de mensaje"));
+	s.appendChild(tipo);
+	const fila = crear("div", {class: "fila"});
+	const izquierda = crear("div");
+	const derecha = crear("div");
+	campo(izquierda, "Origen", selectorNodo("origen"));
+	campo(derecha, "Destino", selectorNodo("destino"));
+	fila.append(izquierda, derecha);
+	s.appendChild(fila);
+	const metrica = campo(s, "Cómo eligen la ruta los routers", selectorOpciones([["time", "Menor tiempo de llegada (latencia + procesamiento)"], ["hops", "Menos saltos (como RIP)"], ["weight", "Costo de SNDlib (como OSPF)"]]));
+	const tecnica = campo(s, "Algoritmo", selectorOpciones([["dijkstra", "Dijkstra (estado de enlace, OSPF)"], ["bellmanford", "Bellman-Ford (vector distancia, RIP)"]]));
+	const procesamientoValor = crear("span", {class: "pill"});
+	const procesamiento = crear("input", {type: "range", min: 0, max: 20, step: 0.5, value: estado.red.hopDelay !== undefined ? estado.red.hopDelay : 1});
+	const etiquetaProcesamiento = crear("label", {}, "Procesamiento en cada router ");
+	etiquetaProcesamiento.appendChild(procesamientoValor);
+	s.append(etiquetaProcesamiento, procesamiento);
+	const velocidadValor = crear("span", {class: "pill"});
+	const velocidad = crear("input", {type: "range", min: 0, max: VELOCIDADES.length - 1, step: 1, value: 2});
+	const etiquetaVelocidad = crear("label", {}, "Velocidad de la animación ");
+	etiquetaVelocidad.appendChild(velocidadValor);
+	s.append(etiquetaVelocidad, velocidad);
+
+	const controles = crear("div", {class: "botones"});
+	const reproducir = crear("button", {class: "btn"}, "▶ Simular");
+	const siguiente = crear("button", {class: "btn sec"}, "⏭ Siguiente salto");
+	const reiniciar = crear("button", {class: "btn sec"}, "⏮ Reiniciar");
+	const comparar = crear("button", {class: "btn sec"}, "Comparar algoritmos");
+	controles.append(reproducir, siguiente, reiniciar, comparar);
+	s.appendChild(controles);
+
+	const reloj = crear("div", {class: "reloj"});
+	const relojValor = crear("span", {class: "grande"}, "0.00 ms");
+	const relojDetalle = crear("span", {class: "nota"}, "");
+	reloj.append(relojValor, relojDetalle);
+	s.appendChild(reloj);
+	const progreso = crear("div", {class: "progreso"});
+	const progresoBarra = crear("div");
+	progreso.appendChild(progresoBarra);
+	s.appendChild(progreso);
+
+	const ejemplo = estado.red.nodes.findIndex(n => n.name === "si1.si");
+	const ejemploDestino = estado.red.nodes.findIndex(n => n.name === "se1.se");
+	if (ejemplo >= 0 && ejemploDestino >= 0) {
+		const sugerencia = crear("div", {class: "aviso"});
+		sugerencia.appendChild(document.createTextNode("Prueba esto: de Eslovenia a Suecia con 0 ms de procesamiento la ruta más rápida da 6 saltos por Europa del Este; sube el procesamiento a 3 ms y cambia a 3 saltos por Austria y Alemania. "));
+		const probar = crear("button", {class: "btn mini sec"}, "Cargar el ejemplo");
+		probar.onclick = () => {
+			estado.origen = ejemplo;
+			estado.destino = ejemploDestino;
+			ponerTipo(true);
+			metrica.value = "time";
+			procesamiento.value = 0;
+			sincronizarSelectores();
+			recalcular();
+		};
+		sugerencia.appendChild(probar);
+		s.appendChild(sugerencia);
+	}
+
+	const resumen = seccion(tablero, null);
+	const eventosSeccion = seccion(tablero, null);
+
+	let esUnicast = false;
+	function ponerTipo(valor) {
+		esUnicast = valor;
+		difusion.setAttribute("aria-pressed", String(!valor));
+		unicast.setAttribute("aria-pressed", String(valor));
+		derecha.classList.toggle("oculto", !valor);
+	}
+	difusion.onclick = () => { ponerTipo(false); recalcular(); };
+	unicast.onclick = () => { ponerTipo(true); recalcular(); };
+	ponerTipo(false);
+
+	function opciones() {
+		return {origen: estado.origen, destino: esUnicast ? estado.destino : null, metrica: metrica.value, tecnica: tecnica.value, procesamiento: +procesamiento.value};
+	}
+	function actualizarEtiquetas() {
+		procesamientoValor.textContent = (+procesamiento.value).toFixed(1) + " ms por salto";
+		velocidadValor.textContent = "×" + VELOCIDADES[+velocidad.value];
+	}
+	actualizarEtiquetas();
+
+	async function recalcular() {
+		detenerAnimacion();
+		const pedido = opciones();
+		if (esUnicast && pedido.origen === pedido.destino) {
+			resumen.textContent = "";
+			resumen.appendChild(crear("p", {class: "bad"}, "El origen y el destino son el mismo nodo."));
+			return;
+		}
+		const actual = await ejecutar("propagation", entradaPropagacion(pedido, true));
+		if (actual.salida.error) {
+			mostrarError(resumen, actual.salida);
+			eventosSeccion.textContent = "";
+			estado.capa = {mostrarExtremos: true, usaDestino: esUnicast};
+			pedirDibujo();
+			return;
+		}
+		const base = hayFallas() ? (await ejecutar("propagation", entradaPropagacion(pedido, false))).salida : actual.salida;
+		prepararAnimacion(actual.salida, base, actual.ms);
+	}
+
+	function prepararAnimacion(salida, base, ms) {
+		const porNodo = {};
+		salida.nodes.forEach(n => { porNodo[n.id] = n; });
+		const enRuta = esUnicast ? new Set(salida.path) : null;
+		const eventos = salida.events.filter(e => !enRuta || enRuta.has(e.node)).map(e => ({
+			nodo: e.node, desde: e.from, enlace: e.edge, tiempo: e.time, saltos: e.hops,
+			tiempoSalida: e.from === null ? 0 : porNodo[e.from].time
+		}));
+		const fin = esUnicast ? Math.max(salida.pathTime, 0) : salida.maxTime;
+		const arbol = new Set(salida.events.filter(e => e.edge >= 0 && (!enRuta || enRuta.has(e.node))).map(e => e.edge));
+		const inalcanzables = new Set();
+		salida.unreachable.forEach(i => inalcanzables.add(i));
+		let rutaFantasma = null;
+		if (esUnicast && hayFallas() && base.path && base.path.join() !== salida.path.join()) {
+			rutaFantasma = base.path;
+		}
+		estado.capa = {mostrarExtremos: true, usaDestino: esUnicast, propagacion: {porNodo, arbol, inalcanzables}, rutaFantasma};
+		estado.animacion = {eventos, fin, tiempo: 0, corriendo: false, ultimoCuadro: 0, filaActual: -1, unicast: esUnicast};
+		pintarResumen(salida, base, ms);
+		pintarEventos();
+		actualizarReloj();
+		pedirDibujo();
+		reproducirAnimacion();
+	}
+
+	function pintarResumen(salida, base, ms) {
+		resumen.textContent = "";
+		resumen.appendChild(crear("h3", {}, "Resultado"));
+		const totalActivos = estado.red.nodes.length - estado.nodosCaidos.size;
+		if (esUnicast) {
+			if (salida.targetReachable) {
+				resumen.appendChild(crear("p", {class: "grande"}, formatoMs(salida.pathTime)));
+				resumen.appendChild(crear("p", {}, salida.path.map(nombreCorto).join(" → ")));
+				const kilometros = salida.pathEdges.reduce((suma, e) => suma + estado.red.links[e].km, 0);
+				resumen.appendChild(crear("p", {class: "nota"}, (salida.path.length - 1) + " saltos, " + formatoMiles(kilometros) + " km de fibra. Calculado con " + salida.algorithm + " en " + ms.toFixed(1) + " ms."));
+			} else {
+				resumen.appendChild(crear("p", {class: "grande bad"}, "No llega"));
+				resumen.appendChild(crear("p", {class: "bad"}, "Con las fallas activas no queda ningún camino de " + nombreLargo(estado.origen) + " a " + nombreLargo(estado.destino) + "."));
+			}
+		} else {
+			resumen.appendChild(crear("p", {class: "grande"}, formatoMs(salida.maxTime)));
+			resumen.appendChild(crear("p", {class: "nota"}, "Tiempo para que el mensaje llegue a " + salida.reached + " de " + totalActivos + " nodos activos. Calculado con " + salida.algorithm + " en " + ms.toFixed(1) + " ms."));
+			if (salida.unreachable.length) {
+				resumen.appendChild(crear("p", {class: "bad"}, "Quedaron aislados por las fallas: " + salida.unreachable.map(nombreLargo).join(", ") + "."));
+			}
+		}
+		if (hayFallas()) {
+			resumen.appendChild(crear("h3", {}, "Comparado con la red sin fallas"));
+			if (esUnicast) {
+				const antes = base.targetReachable ? formatoMs(base.pathTime) + " por " + base.path.map(nombreCorto).join(" → ") : "no llegaba";
+				const despues = salida.targetReachable ? formatoMs(salida.pathTime) + " por " + salida.path.map(nombreCorto).join(" → ") : "no llega";
+				resumen.appendChild(tabla(["", "Ruta"], [["Sin fallas", antes], ["Con fallas", despues]]));
+				if (base.targetReachable && salida.targetReachable) {
+					const diferencia = salida.pathTime - base.pathTime;
+					resumen.appendChild(crear("p", {class: diferencia > 0 ? "bad" : "ok"}, diferencia > 1e-9 ? "La falla obliga a desviarse: +" + formatoMs(diferencia) + "." : "La falla no afecta esta ruta."));
+				}
+			} else {
+				const basePorNodo = {};
+				base.nodes.forEach(n => { basePorNodo[n.id] = n; });
+				const cambios = salida.nodes.filter(n => !estado.nodosCaidos.has(n.id)).map(n => {
+					const b = basePorNodo[n.id];
+					return {id: n.id, antes: b.reachable ? b.time : null, despues: n.reachable ? n.time : null};
+				}).filter(c => c.antes !== c.despues && !(c.antes !== null && c.despues !== null && Math.abs(c.antes - c.despues) < 1e-9));
+				if (!cambios.length) {
+					resumen.appendChild(crear("p", {class: "ok"}, "Ningún nodo nota la falla: el mensaje llega igual de rápido a todos."));
+				} else {
+					cambios.sort((a, b) => (b.despues === null) - (a.despues === null) || ((b.despues || 0) - (b.antes || 0)) - ((a.despues || 0) - (a.antes || 0)));
+					resumen.appendChild(tabla(["Nodo", "Sin fallas", "Con fallas", "Diferencia"], cambios.slice(0, 10).map(c => [
+						nombreLargo(c.id), c.antes === null ? "—" : formatoMs(c.antes), c.despues === null ? "aislado" : formatoMs(c.despues),
+						c.despues === null ? "no llega" : "+" + formatoMs(c.despues - c.antes)]), {numericas: [1, 2, 3]}));
+					resumen.appendChild(crear("p", {class: "nota"}, cambios.length + " nodo(s) afectados por las fallas."));
+				}
+			}
+		}
+	}
+
+	function pintarEventos() {
+		eventosSeccion.textContent = "";
+		eventosSeccion.appendChild(crear("h3", {}, "Lista de eventos"));
+		eventosSeccion.appendChild(crear("p", {class: "nota"}, "Como en el modo simulación de Packet Tracer: cada fila es la llegada del mensaje a un nodo. Clic en una fila para saltar a ese momento."));
+		const contenedor = crear("div", {class: "eventos"});
+		const t = tabla(["Tiempo", "Llega a", "Desde", "Salto"], estado.animacion.eventos.map(e => [formatoMs(e.tiempo), nombreLargo(e.nodo), e.desde === null ? "(origen)" : nombreCorto(e.desde), String(e.saltos)]), {numericas: [0, 3]});
+		[...t.querySelectorAll("tr")].slice(1).forEach((tr, k) => {
+			tr.classList.add("clic");
+			tr.onclick = () => {
+				pausar();
+				estado.animacion.tiempo = estado.animacion.eventos[k].tiempo;
+				actualizarReloj();
+				dibujarCapaDinamica();
+			};
+		});
+		contenedor.appendChild(t);
+		eventosSeccion.appendChild(contenedor);
+	}
+
+	function actualizarReloj() {
+		const animacion = estado.animacion;
+		if (!animacion) {
+			return;
+		}
+		relojValor.textContent = formatoMs(animacion.tiempo);
+		const llegados = animacion.eventos.filter(e => e.tiempo <= animacion.tiempo + 1e-9).length;
+		const avance = animacion.unicast ? "nodo " + llegados + " de " + animacion.eventos.length + " de la ruta" : llegados + " de " + animacion.eventos.length + " nodos";
+		relojDetalle.textContent = (animacion.tiempo / 1000).toFixed(4) + " s · " + avance;
+		progresoBarra.style.width = (animacion.fin > 0 ? Math.min(100, 100 * animacion.tiempo / animacion.fin) : 100) + "%";
+		reproducir.textContent = animacion.corriendo ? "⏸ Pausa" : (animacion.tiempo >= animacion.fin ? "▶ Repetir" : "▶ Continuar");
+		const contenedor = eventosSeccion.querySelector(".eventos");
+		const filas = [...eventosSeccion.querySelectorAll("tr")].slice(1);
+		const actual = llegados - 1;
+		if (actual !== animacion.filaActual) {
+			filas.forEach((fila, k) => fila.classList.toggle("actual", k === actual));
+			// Solo se desplaza la lista de eventos, nunca el tablero completo.
+			if (filas[actual] && contenedor && animacion.corriendo) {
+				contenedor.scrollTop = Math.max(0, filas[actual].offsetTop - contenedor.clientHeight / 2);
+			}
+			animacion.filaActual = actual;
+		}
+	}
+
+	// Cada vez que la animacion arranca recibe un numero de ciclo nuevo; un cuadro que pertenece a
+	// un ciclo viejo (por ejemplo, tras pausar y reanudar muy rapido) se descarta, para que nunca
+	// corran dos ciclos a la vez y el reloj avance al doble.
+	function cuadro(marca, animacion, ciclo) {
+		const vigente = animacion === estado.animacion && animacion.corriendo && ciclo === animacion.ciclo;
+		if (vigente) {
+			const transcurrido = animacion.ultimoCuadro ? marca - animacion.ultimoCuadro : 0;
+			animacion.ultimoCuadro = marca;
+			animacion.tiempo = Math.min(animacion.fin, animacion.tiempo + transcurrido * VELOCIDADES[+velocidad.value] / MS_REALES_POR_MS_SIMULADO);
+			if (animacion.tiempo >= animacion.fin) {
+				animacion.corriendo = false;
+			}
+			actualizarReloj();
+			dibujarCapaDinamica();
+			if (animacion.corriendo) {
+				requestAnimationFrame(siguienteMarca => cuadro(siguienteMarca, animacion, ciclo));
+			}
+		}
+	}
+	function reproducirAnimacion() {
+		const animacion = estado.animacion;
+		if (!animacion) {
+			return;
+		}
+		if (animacion.tiempo >= animacion.fin) {
+			animacion.tiempo = 0;
+		}
+		animacion.corriendo = true;
+		animacion.ultimoCuadro = 0;
+		animacion.ciclo = (animacion.ciclo || 0) + 1;
+		const ciclo = animacion.ciclo;
+		actualizarReloj();
+		requestAnimationFrame(marca => cuadro(marca, animacion, ciclo));
+	}
+	function pausar() {
+		if (estado.animacion) {
+			estado.animacion.corriendo = false;
+			actualizarReloj();
+		}
+	}
+	reproducir.onclick = () => {
+		if (!estado.animacion) {
+			recalcular();
+		} else if (estado.animacion.corriendo) {
+			pausar();
+		} else {
+			reproducirAnimacion();
+		}
+	};
+	siguiente.onclick = () => {
+		const animacion = estado.animacion;
+		if (!animacion) {
+			return;
+		}
+		pausar();
+		const proximo = animacion.eventos.find(e => e.tiempo > animacion.tiempo + 1e-9);
+		animacion.tiempo = proximo ? proximo.tiempo : animacion.fin;
+		actualizarReloj();
+		dibujarCapaDinamica();
+	};
+	reiniciar.onclick = () => {
+		if (estado.animacion) {
+			pausar();
+			estado.animacion.tiempo = 0;
+			actualizarReloj();
+			dibujarCapaDinamica();
+		}
+	};
+	comparar.onclick = async () => {
+		pausar();
+		const filas = [];
+		for (const [clave, nombre] of [["dijkstra", "Dijkstra"], ["bellmanford", "Bellman-Ford"]]) {
+			const pedido = Object.assign(opciones(), {tecnica: clave});
+			const {salida, ms} = await ejecutar("propagation", entradaPropagacion(pedido, true));
+			filas.push({nombre, salida, ms});
+		}
+		const iguales = filas[0].salida.nodes && JSON.stringify(filas[0].salida.nodes) === JSON.stringify(filas[1].salida.nodes);
+		const caja = crear("div");
+		caja.appendChild(crear("h3", {}, "Dijkstra contra Bellman-Ford"));
+		caja.appendChild(tabla(["Algoritmo", "Llega a todos en", "Tiempo (ms)"], filas.map(f => [f.nombre, f.salida.error ? "error" : formatoMs(f.salida.maxTime), f.ms.toFixed(1)]), {numericas: [1, 2]}));
+		caja.appendChild(crear("p", {class: iguales ? "ok" : "bad"}, iguales ? "Los dos eligen exactamente el mismo árbol de rutas: mismas distancias, mismos saltos y mismos padres." : "Los árboles difieren."));
+		caja.appendChild(crear("p", {class: "nota"}, "Dijkstra es O((V + E) log V) y Bellman-Ford O(V · E). Con 22 nodos ni se nota; en una red grande Dijkstra gana por mucho. Por eso OSPF usa Dijkstra y RIP, más viejo, usa la idea de Bellman-Ford."));
+		resumen.appendChild(caja);
+	};
+
+	let espera = null;
+	function recalcularConPausa() {
+		actualizarEtiquetas();
+		clearTimeout(espera);
+		espera = setTimeout(recalcular, 160);
+	}
+	procesamiento.oninput = recalcularConPausa;
+	velocidad.oninput = actualizarEtiquetas;
+	metrica.onchange = recalcular;
+	tecnica.onchange = recalcular;
+	estado.recalcular = recalcular;
+	ponerEstadoMapa("El punto naranja es el mensaje. Usa «Provocar falla» mientras corre la simulación para ver cómo se reencamina.");
+	recalcular();
+};
+
+function detenerAnimacion() {
+	if (estado.animacion) {
+		estado.animacion.corriendo = false;
+	}
+	estado.animacion = null;
+	const capa = document.getElementById("capaDinamica");
+	if (capa) {
+		capa.textContent = "";
+	}
+}
+
+// Dibuja lo que cambia cuadro a cuadro: nodos que ya recibieron el mensaje y paquetes en camino.
+function dibujarCapaDinamica() {
+	const capaDinamica = document.getElementById("capaDinamica");
+	capaDinamica.textContent = "";
+	const animacion = estado.animacion;
+	if (!animacion || !estado.capa.propagacion || !estado.vista) {
+		return;
+	}
+	const px = pixel();
+	const P = estado.proyeccion;
+	const t = animacion.tiempo;
+	const muchos = estado.red.nodes.length > 60;
+	const radio = radioBase(muchos, px);
+	const grosor = (muchos ? 1.4 : 3) * px;
+	const paquete = (muchos ? 2.6 : 5) * px;
+	animacion.eventos.forEach(e => {
+		const destino = P[e.nodo];
+		if (e.desde !== null) {
+			const origen = P[e.desde];
+			if (t >= e.tiempo) {
+				linea(capaDinamica, origen, destino, "stroke:var(--alcanzado);stroke-width:" + grosor + ";stroke-linecap:round;pointer-events:none");
+			} else if (t >= e.tiempoSalida) {
+				const avance = (t - e.tiempoSalida) / Math.max(e.tiempo - e.tiempoSalida, 1e-9);
+				const punto = [origen[0] + (destino[0] - origen[0]) * avance, origen[1] + (destino[1] - origen[1]) * avance];
+				linea(capaDinamica, origen, punto, "stroke:var(--paquete);stroke-width:" + grosor + ";stroke-linecap:round;pointer-events:none;opacity:" + (muchos ? ".6" : "1"));
+				if (!muchos) {
+					capaDinamica.appendChild(crear("circle", {cx: punto[0], cy: punto[1], r: paquete * 1.8, style: "fill:var(--paquete);opacity:.25;pointer-events:none"}));
+				}
+				capaDinamica.appendChild(crear("circle", {cx: punto[0], cy: punto[1], r: paquete, style: "fill:var(--paquete);stroke:var(--panel);stroke-width:" + (muchos ? 0.8 : 1.5) * px + ";pointer-events:none"}));
+			}
+		}
+		if (t >= e.tiempo - 1e-9) {
+			capaDinamica.appendChild(crear("circle", {cx: destino[0], cy: destino[1], r: radio, style: "fill:" + (e.desde === null ? "var(--acc2)" : "var(--alcanzado)") + ";pointer-events:none"}));
+			const etiqueta = estado.etiquetas && estado.etiquetas[e.nodo];
+			if (!muchos && e.desde !== null && etiqueta) {
+				capaDinamica.appendChild(crear("text", {x: etiqueta.x, y: etiqueta.y2, style: "font-size:" + 10.5 * px + "px;fill:var(--alcanzado);font-weight:600;font-variant-numeric:tabular-nums;paint-order:stroke;stroke:var(--mar);stroke-width:" + 3 * px + "px;pointer-events:none"}, e.tiempo.toFixed(1) + " ms"));
+			}
+		}
+	});
+}
+
+/* ---------- 7.7 Que pasa si falla... ---------- */
+HERRAMIENTAS.fallas = tablero => {
+	const s = seccion(tablero, "¿Qué pasa si falla…?", "Tira enlaces o nodos con «Provocar falla» arriba del mapa y mide el daño. O deja que el programa busque los enlaces más críticos.");
+	s.appendChild(crear("h3", {}, "Fallas activas"));
+	if (!hayFallas()) {
+		s.appendChild(crear("p", {class: "nota"}, "Ninguna por ahora. Elige «Provocar falla» y da clic en un enlace o nodo del mapa."));
+	} else {
+		const lista = crear("ul", {class: "lista"});
+		[...estado.enlacesCaidos].forEach(i => {
+			const enlace = estado.red.links[i];
+			const li = crear("li", {}, "Enlace " + nombreCorto(enlace.u) + " – " + nombreCorto(enlace.v) + " ");
+			const reparar = crear("button", {class: "btn mini sec"}, "reparar");
+			reparar.onclick = () => alternarFallaEnlace(i);
+			li.appendChild(reparar);
+			lista.appendChild(li);
+		});
+		[...estado.nodosCaidos].forEach(i => {
+			const li = crear("li", {}, "Nodo " + nombreLargo(i) + " ");
+			const reparar = crear("button", {class: "btn mini sec"}, "reparar");
+			reparar.onclick = () => alternarFallaNodo(i);
+			li.appendChild(reparar);
+			lista.appendChild(li);
+		});
+		s.appendChild(lista);
+		const limpiar = crear("button", {class: "btn peligro mini"}, "Quitar todas las fallas");
+		limpiar.onclick = limpiarFallas;
+		s.appendChild(limpiar);
+	}
+
+	const medicion = seccion(tablero, "Impacto en la red");
+	const fila = crear("div", {class: "fila"});
+	const izquierda = crear("div");
+	const derecha = crear("div");
+	campo(izquierda, "Origen", selectorNodo("origen"));
+	campo(derecha, "Destino", selectorNodo("destino"));
+	fila.append(izquierda, derecha);
+	medicion.appendChild(fila);
+	const botones = crear("div", {class: "botones"});
+	const medir = crear("button", {class: "btn"}, "Medir impacto");
+	const buscar = crear("button", {class: "btn sec"}, "Buscar enlaces críticos");
+	botones.append(medir, buscar);
+	medicion.appendChild(botones);
+	const resultado = crear("div");
+	medicion.appendChild(resultado);
+
+	async function indicadores(conFallas) {
+		const nodos = conFallas ? indicesNodosActivos() : estado.red.nodes.map((n, i) => i);
+		const enlaces = conFallas ? indicesEnlacesActivos() : estado.red.links.map((l, i) => i);
+		const mst = (await ejecutar("mst", {nodes: nodos, edges: enlaces.map(i => [estado.red.links[i].u, estado.red.links[i].v, estado.red.links[i].cost])})).salida;
+		const flujoEntrada = conFallas ? entradaFlujo(estado.origen, estado.destino) : {n: estado.red.nodes.length, edges: estado.red.links.map(l => [l.u, l.v, l.capacity]), directed: false, source: estado.origen, sink: estado.destino};
+		const flujo = (await ejecutar("maxflow", flujoEntrada)).salida;
+		const propagacion = (await ejecutar("propagation", entradaPropagacion({origen: estado.origen, destino: null, metrica: "time", tecnica: "dijkstra", procesamiento: estado.red.hopDelay || 1}, conFallas))).salida;
+		return {mst, flujo, propagacion, totalNodos: nodos.length};
+	}
+
+	async function medirImpacto() {
+		estado.capa = {mostrarExtremos: true, usaDestino: true};
+		pedirDibujo();
+		if (estado.nodosCaidos.has(estado.origen)) {
+			resultado.textContent = "";
+			resultado.appendChild(crear("p", {class: "bad"}, "El origen está caído; elige otro origen para medir."));
+			return;
+		}
+		resultado.textContent = "Midiendo con el programa en C++…";
+		const antes = await indicadores(false);
+		const despues = await indicadores(true);
+		const conectada = x => !x.propagacion.error && x.propagacion.unreachable.length === 0;
+		const filas = [
+			["Red conectada", conectada(antes) ? "sí" : "no", conectada(despues) ? "sí" : "no"],
+			["Nodos aislados", String(antes.propagacion.unreachable ? antes.propagacion.unreachable.length : "—"), String(despues.propagacion.unreachable ? despues.propagacion.unreachable.length : "—")],
+			["Costo del árbol mínimo (km)", formatoMiles(antes.mst.totalCost), despues.mst.connected ? formatoMiles(despues.mst.totalCost) : "no hay árbol"],
+			["Flujo máximo (Mbit/s)", formatoMiles(antes.flujo.maxFlow), formatoMiles(despues.flujo.maxFlow)],
+			["Un aviso llega a todos en", formatoMs(antes.propagacion.maxTime), despues.propagacion.error ? "—" : formatoMs(despues.propagacion.maxTime)]
+		];
+		resultado.textContent = "";
+		resultado.appendChild(tabla(["Indicador", "Sin fallas", "Con fallas"], filas, {numericas: [1, 2]}));
+		resultado.appendChild(crear("p", {class: "nota"}, "Flujo de " + nombreLargo(estado.origen) + " a " + nombreLargo(estado.destino) + "; el aviso sale de " + nombreLargo(estado.origen) + ". Si no hay fallas, las dos columnas son iguales."));
+	}
+
+	let cancelado = false;
+	async function buscarCriticos() {
+		const candidatos = indicesEnlacesActivos();
+		if (candidatos.length > 150 && !confirm("Son " + candidatos.length + " enlaces: se harán " + 2 * candidatos.length + " llamadas al programa y puede tardar. ¿Continuar?")) {
+			return;
+		}
+		cancelado = false;
+		resultado.textContent = "";
+		const progresoTexto = crear("p", {class: "nota"});
+		const cancelar = crear("button", {class: "btn mini peligro"}, "Cancelar");
+		cancelar.onclick = () => { cancelado = true; };
+		resultado.append(progresoTexto, cancelar);
+		const base = (await ejecutar("maxflow", entradaFlujo(estado.origen, estado.destino))).salida.maxFlow;
+		const filas = [];
+		for (let k = 0; k < candidatos.length && !cancelado; k++) {
+			const i = candidatos[k];
+			progresoTexto.textContent = "Probando enlace " + (k + 1) + " de " + candidatos.length + "…";
+			const extra = new Set([i]);
+			const flujo = (await ejecutar("maxflow", entradaFlujo(estado.origen, estado.destino, extra))).salida.maxFlow;
+			const propagacion = (await ejecutar("propagation", entradaPropagacion({origen: estado.origen, destino: null, metrica: "time", tecnica: "dijkstra", procesamiento: 1}, true, extra))).salida;
+			filas.push({i, perdida: base - flujo, aislados: propagacion.unreachable ? propagacion.unreachable.length : 0});
+		}
+		resultado.textContent = "";
+		const daninos = filas.filter(f => f.perdida > 0 || f.aislados > 0);
+		daninos.sort((a, b) => b.aislados - a.aislados || b.perdida - a.perdida);
+		const peorPerdida = Math.max(1, ...daninos.map(f => f.perdida));
+		const criticos = new Map();
+		daninos.forEach(f => criticos.set(f.i, f.aislados > 0 ? 1 : f.perdida / peorPerdida));
+		estado.capa = {mostrarExtremos: true, usaDestino: true, criticos};
+		resultado.appendChild(crear("p", {}, "Flujo base de " + nombreLargo(estado.origen) + " a " + nombreLargo(estado.destino) + ": " + formatoMiles(base) + " Mbit/s." + (cancelado ? " (Búsqueda cancelada: resultados parciales.)" : "")));
+		if (!daninos.length) {
+			resultado.appendChild(crear("p", {class: "ok"}, "Ningún enlace, por sí solo, reduce ese flujo ni deja nodos aislados: para este par la red tiene redundancia suficiente."));
+		} else {
+			resultado.appendChild(crear("p", {}, daninos.length + " de " + filas.length + " enlaces hacen daño si caen solos; los demás no cambian nada para este par:"));
+			const mostrados = daninos.slice(0, 12);
+			const t = tabla(["Enlace", "Flujo perdido", "Nodos aislados"], mostrados.map(f => {
+				const enlace = estado.red.links[f.i];
+				return [nombreCorto(enlace.u) + " – " + nombreCorto(enlace.v), formatoMiles(f.perdida) + " Mbit/s", String(f.aislados)];
+			}), {numericas: [1, 2]});
+			[...t.querySelectorAll("tr")].slice(1).forEach((tr, k) => {
+				tr.classList.add("clic");
+				tr.title = "Clic para tirar este enlace";
+				tr.onclick = () => alternarFallaEnlace(mostrados[k].i);
+			});
+			resultado.appendChild(t);
+			resultado.appendChild(crear("p", {class: "nota"}, "En el mapa, los enlaces críticos están en naranja (más grueso = más daño). Clic en una fila para tirar ese enlace y medir de nuevo."));
+		}
+		pedirDibujo();
+	}
+	medir.onclick = medirImpacto;
+	buscar.onclick = buscarCriticos;
+	estado.capa = {mostrarExtremos: true, usaDestino: true};
+	estado.recalcular = null;
+	ponerEstadoMapa("Origen y destino marcados con anillo. Las fallas se ven en rojo.");
+	if (hayFallas()) {
+		medirImpacto();
+	}
+};
+
+/* ---------- 7.8 Consola de ciberseguridad ---------- */
+function resaltar(texto, rangos) {
+	const piezas = [];
+	let posicion = 0;
+	rangos.slice().sort((a, b) => a[0] - b[0]).forEach(([inicio, fin]) => {
+		if (inicio > 0) {
+			if (inicio - 1 > posicion) {
+				piezas.push(document.createTextNode(texto.slice(posicion, inicio - 1)));
+			}
+			piezas.push(crear("mark", {}, texto.slice(inicio - 1, fin)));
+			posicion = fin;
+		}
+	});
+	piezas.push(document.createTextNode(texto.slice(posicion)));
+	return piezas;
+}
+
+HERRAMIENTAS.consola = tablero => {
+	const red = estado.red;
+	const s = seccion(tablero, "Consola de ciberseguridad", (red.scenario.id === "03_ejemplo_oficial") ? "Transmisiones y firmas del ejemplo oficial de la página del reto: sirven para comprobar a mano los resultados." : "Las transmisiones salen de la matriz de tráfico de GÉANT: cada demanda se escribe en hexadecimal. Puedes editarlas.");
+	const firmas = campo(s, "Firmas de malware (una por línea)", crear("textarea"));
+	firmas.value = (red.signatures || []).join("\n");
+	const transmisionUno = campo(s, "Transmisión 1", crear("textarea"));
+	const transmisionDos = campo(s, "Transmisión 2", crear("textarea"));
+	transmisionUno.value = red.payloads[0] || "";
+	transmisionDos.value = red.payloads[1] || "";
+	const botones = crear("div", {class: "botones"});
+	const analizar = crear("button", {class: "btn"}, "Analizar");
+	botones.appendChild(analizar);
+	s.appendChild(botones);
+	const resultado = seccion(tablero, null);
+	analizar.onclick = async () => {
+		const transmisiones = [transmisionUno.value, transmisionDos.value];
+		const lista = firmas.value.split("\n").map(x => x.trim()).filter(Boolean);
+		resultado.textContent = "Analizando…";
+		const coincidencias = (await ejecutar("matching", {signatures: lista, transmissions: transmisiones})).salida;
+		const palindromos = (await ejecutar("palindrome", {transmissions: transmisiones})).salida;
+		const comun = (await ejecutar("commonsubstr", {transmissions: transmisiones})).salida;
+		resultado.textContent = "";
+		resultado.appendChild(crear("h3", {}, "Firmas: primera posición en cada transmisión (KMP)"));
+		if (coincidencias.error) {
+			mostrarError(resultado, coincidencias);
+		} else {
+			const matriz = coincidencias.matches || [];
+			const celda = valor => valor === undefined ? "?" : (valor > 0 ? "sí, posición " + valor : "no aparece");
+			const t = tabla(["Firma", "Transmisión 1", "Transmisión 2"], lista.map((firma, k) => [firma, celda((matriz[0] || [])[k]), celda((matriz[1] || [])[k])]));
+			[...t.querySelectorAll("tr")].slice(1).forEach((tr, k) => {
+				tr.children[1].className = (matriz[0] || [])[k] > 0 ? "ok" : "bad";
+				tr.children[2].className = (matriz[1] || [])[k] > 0 ? "ok" : "bad";
+			});
+			resultado.appendChild(t);
+			resultado.appendChild(crear("p", {class: "nota"}, "Respuesta del programa (formato del autograder): " + JSON.stringify(matriz) + " — una fila por transmisión, una columna por firma, −1 si no aparece."));
+		}
+		resultado.appendChild(crear("h3", {}, "Palíndromo más largo (Manacher)"));
+		transmisiones.forEach((texto, k) => {
+			const rango = (palindromos.ranges || [])[k];
+			const caja = crear("div", {class: "seq"});
+			resaltar(texto.replace(/\s/g, "").toUpperCase(), rango ? [rango] : []).forEach(n => caja.appendChild(n));
+			resultado.appendChild(caja);
+			resultado.appendChild(crear("p", {class: "nota"}, "Transmisión " + (k + 1) + ": posiciones " + (rango ? rango.join(" a ") : "?")));
+		});
+		resultado.appendChild(crear("h3", {}, "Subcadena común más larga (hashing)"));
+		const rango = comun.range;
+		resultado.appendChild(crear("p", {}, rango ? "Posiciones " + rango.join(" a ") + " de la transmisión 1 (" + comun.length + " caracteres)" : JSON.stringify(comun)));
+		transmisiones.forEach((texto, k) => {
+			const caja = crear("div", {class: "seq"});
+			const r = comun.ranges ? comun.ranges[k] : (k === 0 ? rango : null);
+			resaltar(texto.replace(/\s/g, "").toUpperCase(), r ? [r] : []).forEach(n => caja.appendChild(n));
+			resultado.appendChild(caja);
+		});
+	};
+	ponerEstadoMapa("La consola trabaja sobre el tráfico de la red, no sobre el mapa. Las transmisiones salen de las demandas de GÉANT.");
+	analizar.onclick();
+};
+
+/* ---------- 7.9 Casos de prueba ---------- */
+HERRAMIENTAS.escenarios = tablero => {
+	const s = seccion(tablero, "Casos de prueba", "Cada caso es un archivo en app/data/scenarios. Al cargar uno, toda la aplicación pasa a trabajar con esos datos y se quitan las fallas.");
+	estado.escenarios.forEach(e => {
+		const caja = crear("div", {class: "tarjeta", style: "margin-top:10px"});
+		caja.appendChild(crear("strong", {}, e.nombre + (e.id === estado.red.scenario.id ? " (activo)" : "")));
+		caja.appendChild(crear("p", {class: "nota"}, e.descripcion));
+		caja.appendChild(crear("p", {class: "nota"}, "Fuente: " + e.fuente));
+		const cargar = crear("button", {class: "btn mini"}, "Cargar este caso");
+		cargar.onclick = () => cargarEscenario(e.id);
+		caja.appendChild(cargar);
+		s.appendChild(caja);
+	});
+	estado.capa = {};
+};
+
+/* =====================================================================
+   8. Carga de la red y arranque
+   ===================================================================== */
+
+async function cargarEscenario(id) {
+	detenerAnimacion();
+	const consulta = id ? "?scenario=" + encodeURIComponent(id) : "";
+	estado.red = await (await fetch("/api/network" + consulta)).json();
+	estado.enlacesCaidos.clear();
+	estado.nodosCaidos.clear();
+	estado.origen = estado.red.source;
+	estado.destino = estado.red.sink;
+	document.getElementById("chipEscenario").textContent = estado.red.scenario.nombre;
+	actualizarChipFallas();
+	calcularProyeccion();
+	verEuropa();
+	if (id) {
+		avisar("Caso cargado: " + estado.red.scenario.nombre);
+	}
+	mostrarHerramienta(estado.herramienta);
+}
+
+(async () => {
+	prepararMapa();
+	document.addEventListener("click", cerrarMenus);
+	document.addEventListener("keydown", evento => {
+		if (evento.key === "Escape") {
+			cerrarMenus();
+		}
+	});
+	document.getElementById("hamburguesa").onclick = () => {
+		const barra = document.getElementById("barra");
+		barra.classList.toggle("menuAbierto");
+		document.getElementById("hamburguesa").setAttribute("aria-expanded", String(barra.classList.contains("menuAbierto")));
+	};
+	document.getElementById("chipFallas").onclick = () => mostrarHerramienta("fallas");
+	estado.escenarios = await (await fetch("/api/scenarios")).json();
+	await cargarEscenario("");
+})();
 </script>
 </body>
 </html>

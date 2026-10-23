@@ -1,6 +1,18 @@
 # Sentinela del Norte - TC2038
 
-Siete algoritmos en C++ (MST, TSP, flujo maximo, Voronoi, firmas con KMP, palindromo mas largo y subcomun mas larga) que se comunican por JSON, y una aplicacion que los ejecuta sobre datos reales de la red GEANT (SNDlib).
+Siete algoritmos en C++ (MST, TSP, flujo maximo, Voronoi, firmas con KMP, palindromo mas largo y subcadena comun mas larga) que se comunican por JSON, y una aplicacion que los ejecuta sobre datos reales de la red GEANT (SNDlib). Como extra, un octavo modo, `propagation`, simula como viaja un mensaje por la red (Dijkstra o Bellman-Ford, con enlaces y nodos caidos) para la simulacion tipo Packet Tracer de la aplicacion.
+
+## Contenido de la entrega
+
+| Elemento | Que es |
+|---|---|
+| `src/` | `main.cpp` y nueve encabezados, uno por responsabilidad |
+| `app/` | Aplicacion SENTINEL Digital Twin, datos de GEANT y casos de prueba |
+| `tests/` | Casos conocidos, equivalencia entre tecnicas, estres contra fuerza bruta y benchmarks |
+| `results/` | Evidencia experimental: tiempos, memoria y entorno de la corrida |
+| `README.md` | Este archivo |
+| `team.txt` | Integrantes, matriculas y contribuciones |
+| `ReflexSENTINEL_A01385956.pdf` | Documento de reflexion: modelos, alternativas, correctitud, complejidad, experimentos y estandares |
 
 ## Instalacion y dependencias
 
@@ -41,6 +53,7 @@ Si algo falla responde `{"error": "..."}` (nunca usa excepciones: el compilador 
 | `mst` | Kruskal con Union-Find | `prim` (cola de prioridad) | O(E log E) | O(V + E) |
 | `tsp` | Held-Karp exacto hasta 16 nodos; si no, vecino mas cercano + 2-opt | `heldkarp`, `2opt`, `nn` | O(n^2 2^n) exacto; O(n^2) por pasada de 2-opt | O(n 2^n) exacto; O(n^2) aproximado |
 | `maxflow` | Dinic | `edmondskarp` | O(V^2 E) contra O(V E^2) | O(V + E) |
+| `propagation` (extra) | Dijkstra con cola de prioridad | `bellmanford` | O((V + E) log V) contra O(V E) | O(V + E) |
 | `voronoi` | Recorte del dominio con el semiplano de cada sitio | `sorted` (vecinos ordenados con corte anticipado) | O(n^2 k), k = vertices por celda | O(n k) la salida, O(k) de trabajo por celda |
 | `matching` | KMP (primera posicion de cada firma) | `naive` | O(n + m) contra O(n m) | O(m) la tabla de fallos; O(1) la ingenua |
 | `palindrome` | Manacher | `expand` (expandir por centros) | O(n) contra O(n^2) | O(n) contra O(1) |
@@ -54,6 +67,7 @@ Detalle de donde sale cada cota de memoria:
 - **MST:** Kruskal guarda las E aristas para ordenarlas y dos arreglos de tamano V para Union-Find. Prim guarda la lista de adyacencia, O(V + E), y una cola de prioridad que llega a O(E).
 - **TSP:** Held-Karp llena una tabla de 2^n subconjuntos por n nodos, de ahi O(n 2^n); esa memoria, y no el tiempo, es la razon del limite de 16 nodos (con 16 ya son ~1 millon de celdas). El camino aproximado solo necesita la matriz de distancias, O(n^2), que es lo mismo que cuesta Floyd-Warshall cuando el grafo no es completo.
 - **Flujo maximo:** los dos guardan la red residual como lista de arcos con su arco inverso, O(V + E); Dinic agrega los niveles del BFS y los iteradores del DFS, ambos O(V).
+- **Propagacion:** los dos guardan la lista de adyacencia, O(V + E), y por nodo su distancia, saltos, padre y tiempo, O(V); Dijkstra agrega la cola de prioridad, que llega a O(E).
 - **Voronoi:** cada celda es un poligono que se recorta semiplano por semiplano, asi que en cualquier momento solo viven los k vertices de una celda; la salida completa ocupa O(n k).
 - **Firmas:** KMP solo necesita la tabla de fallos de la firma, O(m); no copia el texto. La busqueda ingenua no reserva nada.
 - **Palindromo:** Manacher guarda un radio por cada centro, O(n); expandir por centros no guarda nada, y ese es su unico punto a favor.
@@ -61,7 +75,9 @@ Detalle de donde sale cada cota de memoria:
 
 Notas de diseno:
 
-- Todas las posiciones de cadenas son **base 1** y los rangos incluyen los dos extremos. Matching devuelve seis resultados (tres firmas de la transmision 1 y luego las de la 2), cada uno `{"found":true,"position":p}` o `{"found":false}`.
+- Todas las posiciones de cadenas son **base 1** y los rangos incluyen los dos extremos. Matching devuelve en `matches` una matriz con una fila por transmision y una columna por firma, con `-1` si la firma no aparece (`[[13,11,-1],[11,9,-1]]` en el ejemplo oficial). El campo `positions` conserva el formato anterior (`{"found":true,"position":p}` o `{"found":false}`) para las pruebas propias.
+- Flujo maximo, ademas del valor, devuelve el detalle: `flows` (cuanto pasa por cada arista, en el orden de la entrada), `minCut` (las aristas del corte minimo), `minCutCapacity` (que siempre es igual al flujo maximo) y `sourceSide`. Con `"directed": false` cada arista se puede usar en los dos sentidos.
+- Propagacion recibe `edges`, `source` y, opcionales, `target`, `delays` (retardo de cada arista en ms), `hopDelay` (procesamiento por salto), `metric` (`weight`, `hops` o `time`), `failedLinks`, `failedNodes` y `algorithm`. Devuelve el estado de cada nodo, la lista de llegadas en orden de tiempo (`events`), los nodos que quedaron aislados y, si hay destino, la ruta. Ante caminos empatados gana el de menos saltos y luego el de padre con indice menor, para que Dijkstra y Bellman-Ford elijan el mismo arbol.
 - En palindromos y subcadena comun, ante empate se elige el que queda mas a la izquierda.
 - TSP: si el grafo no es completo se calcula antes el camino minimo entre todos los pares (Floyd-Warshall) para visitar cada nodo una vez; la ruta devuelta tiene n + 1 nodos (regresa al inicio).
 - Voronoi: cada celda es un poligono convexo; el area total de las celdas es igual al area del dominio, lo que sirve como verificacion.
@@ -79,6 +95,7 @@ Notas de diseno:
 | `src/tsp.h` | Floyd-Warshall, Held-Karp, vecino mas cercano y 2-opt | Gael |
 | `src/flujo.h` | Dinic y Edmonds-Karp | Damian Gomez |
 | `src/voronoi.h` | Celdas de Voronoi y consulta del sitio mas cercano | Damian Gomez |
+| `src/propagacion.h` | Propagacion de un mensaje: Dijkstra y Bellman-Ford con fallas y retardos (extra para la aplicacion) | Equipo |
 | `src/cadenas.h` | KMP, Manacher y subcadena comun mas larga | David Rangel |
 | `app/` | Interfaz web y pipeline GEANT | David Rangel |
 
@@ -87,10 +104,14 @@ Las pruebas (`tests/`), los benchmarks (`results/`) y la revision del estandar d
 ## Pruebas
 
 ```
-bash tests/ejecutarPruebas.sh          # casos conocidos, incluidos los ejemplos oficiales de la pagina
+bash tests/ejecutarPruebas.sh          # 28 casos conocidos, incluidos los ejemplos oficiales de la pagina
 python3 tests/equivalencia.py ./sentinel   # las dos tecnicas de cada modo dan lo mismo (casos aleatorios)
-python3 tests/estres.py ./sentinel         # compara contra fuerza bruta y contra una implementacion de referencia
+python3 tests/estres.py ./sentinel         # compara contra fuerza bruta y contra implementaciones de referencia
 ```
+
+`estres.py` revisa tambien el detalle del flujo (capacidades respetadas, conservacion en cada nodo, corte
+minimo igual al flujo maximo y que el corte de verdad separe la fuente del sumidero) y compara la
+propagacion contra Floyd-Warshall escrito en Python, con enlaces y nodos caidos al azar y las tres metricas.
 
 ## Benchmarks
 
@@ -118,17 +139,27 @@ memoria y se ve en los numeros, y una tecnica mas elaborada (Voronoi ordenado) p
 - [x] Aplicacion web (`app/server.py`, ver `app/README.md`)
 - [x] Benchmarks de tiempo y memoria, con el entorno documentado en `results/entorno.txt`
 - [x] Casos de prueba cargables desde la aplicacion (`app/data/scenarios`)
-- [ ] PDF de reflexion
+- [x] PDF de reflexion (`ReflexSENTINEL_A01385956.pdf`)
+- [x] Formato de salida de matching corregido tras la revision con el profesor
+- [x] Mejoras de la aplicacion pedidas en la revision: barra de menus, zoom, simulacion de propagacion y flujo pintado en el mapa
 
-## Limitacion conocida
+## Formato de matching
 
-El modo `matching` no pasa los casos del autograder en linea, aunque el algoritmo es correcto: reproduce el
-ejemplo oficial de la pagina (ABBA en 13 y 11, FF en 11 y 9, DEAD ausente en las dos transmisiones) y coincide
-con fuerza bruta en miles de casos aleatorios, como comprueba `tests/estres.py`. Lo que no logramos acertar es
-el **esquema de salida** que espera el evaluador: probamos once combinaciones de orden de los seis resultados
-y de como marcar la firma ausente. La version entregada usa el formato que describe la pagina en "Formatos de
-salida": seis resultados, las tres firmas sobre la transmision 1 y luego sobre la 2, cada uno como
-`{"found": true, "position": p}` o `{"found": false}`. Queda como pregunta abierta para el profesor.
+Durante el desarrollo, el modo `matching` no pasaba los casos del autograder en linea aunque el algoritmo era
+correcto: reproducia el ejemplo oficial de la pagina (ABBA en 13 y 11, FF en 11 y 9, DEAD ausente) y coincidia
+con fuerza bruta en miles de casos aleatorios. Probamos once formatos de salida sin acertar.
+
+En la revision, el profesor nos compartio su implementacion de referencia. No la copiamos: la usamos para
+entender el esquema y lo adaptamos a nuestra arquitectura (nuestro KMP de `construirTablaFallos` y
+`buscarPrimeraAparicion`, nuestro `json.h` y nuestras convenciones). La diferencia estaba en dos detalles que
+ninguno de los once intentos combinaba:
+
+- la salida es una **matriz anidada**: una fila por transmision y, en cada fila, la posicion de cada firma;
+- una firma ausente se marca con **-1**, no con 0 ni con un objeto.
+
+`resolverFirmas` (`src/cadenas.h`) arma ahora esa matriz en el campo `matches`: `[[13,11,-1],[11,9,-1]]` en el
+ejemplo oficial. El algoritmo no cambio. Falta confirmar el resultado corriendo de nuevo el autograder en linea
+con esta version.
 
 ## Estandar de codificacion
 

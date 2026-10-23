@@ -71,6 +71,27 @@ def ek(n,edges,s,t):
         v=t
         while v!=s: cap[par[v]][v]-=f; cap[v][par[v]]+=f; v=par[v]
         flow+=f
+def flow_detail_ok(n,edges,s,t,r,directed):
+    # capacidad respetada, conservacion en cada nodo, corte = flujo maximo y el corte separa s de t
+    bal=[0]*n
+    for (u,v,f,c),e in zip(r["flows"],edges):
+        if (u,v,c)!=(e[0],e[1],e[2]): return False
+        if f>c+1e-9 or (directed and f< -1e-9) or (not directed and f< -c-1e-9): return False
+        bal[u]-=f; bal[v]+=f
+    if any(abs(bal[x])>1e-6 for x in range(n) if x not in (s,t)): return False
+    if abs(bal[t]-r["maxFlow"])>1e-6 or abs(r["minCutCapacity"]-r["maxFlow"])>1e-6: return False
+    cut={e[3] for e in r["minCut"]}
+    adj=[[] for _ in range(n)]
+    for i,(u,v,c) in enumerate(edges):
+        if i in cut or c<=0: continue
+        adj[u].append(v)
+        if not directed: adj[v].append(u)
+    seen={s}; q=deque([s])
+    while q:
+        x=q.popleft()
+        for y in adj[x]:
+            if y not in seen: seen.add(y); q.append(y)
+    return t not in seen or r["maxFlow"]==0
 bad=0
 for _ in range(200):
     n=random.randint(2,12)
@@ -80,7 +101,48 @@ for _ in range(200):
     s,t=0,n-1
     r=run("maxflow",{"n":n,"edges":[list(e) for e in edges],"source":s,"sink":t})
     if "maxFlow" not in r or r["maxFlow"]!=ek(n,edges,s,t): bad+=1; print("FLOW",n,edges,r,ek(n,edges,s,t))
+    elif not flow_detail_ok(n,edges,s,t,r,True): bad+=1; print("FLOW DETAIL",n,edges,r)
+    both=[(u,v,c) for (u,v,c) in edges]+[(v,u,c) for (u,v,c) in edges]
+    ru=run("maxflow",{"n":n,"edges":[list(e) for e in edges],"directed":False,"source":s,"sink":t})
+    if ru["maxFlow"]!=ek(n,both,s,t) or not flow_detail_ok(n,edges,s,t,ru,False): bad+=1; print("FLOW UNDIRECTED",n,edges,ru)
 print("flow bad:",bad)
+# propagation (caminos minimos con fallas) vs Floyd-Warshall en Python
+bad=0
+for _ in range(300):
+    n=random.randint(1,14)
+    edges=[[random.randrange(n),random.randrange(n),random.randint(1,9)] for _ in range(random.randint(0,3*n))]
+    edges=[e for e in edges if e[0]!=e[1]]
+    delays=[random.randint(1,30) for _ in edges]
+    hop=random.choice([0,1,2.5])
+    src=random.randrange(n)
+    fl=[i for i in range(len(edges)) if random.random()<0.2]
+    fn=[x for x in range(n) if x!=src and random.random()<0.15]
+    algo=random.choice(["dijkstra","bellmanford"])
+    met=random.choice(["weight","hops","time"])
+    r=run("propagation",{"n":n,"edges":edges,"delays":delays,"hopDelay":hop,"source":src,"failedLinks":fl,"failedNodes":fn,"algorithm":algo,"metric":met})
+    peso=lambda i:{"weight":edges[i][2],"hops":1,"time":delays[i]+hop}[met]
+    INF=float("inf"); D=[[0 if i==j else INF for j in range(n)] for i in range(n)]
+    usable=lambda i:i not in fl and edges[i][0] not in fn and edges[i][1] not in fn
+    for i,(u,v,w) in enumerate(edges):
+        if usable(i): D[u][v]=min(D[u][v],peso(i)); D[v][u]=min(D[v][u],peso(i))
+    for k in range(n):
+        for i in range(n):
+            for j in range(n):
+                if D[i][k]+D[k][j]<D[i][j]: D[i][j]=D[i][k]+D[k][j]
+    ok="nodes" in r
+    if ok:
+        nodes={x["id"]:x for x in r["nodes"]}
+        for v in range(n):
+            x=nodes[v]; exp=D[src][v]
+            if (exp<INF)!=x["reachable"] or (exp<INF and abs(x["distance"]-exp)>1e-9): ok=False
+            if x["reachable"] and v!=src:
+                p,e=x["parent"],int(x["via"]); u,w,ww=edges[e][0],edges[e][1],peso(int(x["via"]))
+                if not usable(e) or {u,w}!={p,v}: ok=False
+                elif abs(x["distance"]-nodes[p]["distance"]-ww)>1e-9 or x["hops"]!=nodes[p]["hops"]+1: ok=False
+                elif abs(x["time"]-nodes[p]["time"]-delays[e]-hop)>1e-9: ok=False
+        if [e["node"] for e in r["events"]]!=sorted([v for v in range(n) if nodes[v]["reachable"]],key=lambda v:(nodes[v]["time"],v)): ok=False
+    if not ok: bad+=1; print("PROP",algo,n,edges,src,fl,fn,r)
+print("propagation bad:",bad)
 # voronoi: areas sum and nearest check
 bad=0
 for _ in range(30):

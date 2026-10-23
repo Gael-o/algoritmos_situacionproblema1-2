@@ -17,6 +17,7 @@ Archivos de datos (carpeta app/data):
 """
 
 import json
+import math
 import random
 import os
 import re
@@ -27,6 +28,28 @@ RAIZ = os.path.dirname(os.path.abspath(__file__))
 DATOS = os.path.join(RAIZ, "data")
 RESULTADOS = os.path.join(os.path.dirname(RAIZ), "results")
 SEMILLA_FIRMAS = ["DEADBEEF", "FF00FF", "C0FFEE"]
+RADIO_TIERRA_KM = 6371.0
+VELOCIDAD_FIBRA_KM_POR_MS = 200.0    # la luz en fibra optica viaja a ~2/3 de c: unos 200 000 km/s
+RETARDO_PROCESAMIENTO_MS = 1.0       # retardo tipico de un router por salto, valor inicial de la simulacion
+
+
+def distanciaKm(coordUno, coordDos):
+    """Distancia en km sobre la superficie de la Tierra (formula de haversine) entre dos puntos [lon, lat].
+    Es la distancia en linea recta: la fibra real suele ser mas larga, asi que es una cota inferior."""
+    lonUno, latUno = math.radians(coordUno[0]), math.radians(coordUno[1])
+    lonDos, latDos = math.radians(coordDos[0]), math.radians(coordDos[1])
+    a = math.sin((latDos - latUno) / 2) ** 2 + math.cos(latUno) * math.cos(latDos) * math.sin((lonDos - lonUno) / 2) ** 2
+    return 2 * RADIO_TIERRA_KM * math.asin(math.sqrt(a))
+
+
+def retardoMs(coordUno, coordDos):
+    """Retardo de propagacion de un enlace de fibra en milisegundos: su distancia entre la velocidad de la luz en la fibra."""
+    return distanciaKm(coordUno, coordDos) / VELOCIDAD_FIBRA_KM_POR_MS
+
+
+def retardosEnlaces(red):
+    """Retardo en ms de cada enlace de la red, en el mismo orden que red["enlaces"]."""
+    return [round(retardoMs(red["coords"][u], red["coords"][v]), 3) for (u, v, capacidad, costo) in red["enlaces"]]
 
 
 def leerNodos(ruta):
@@ -201,6 +224,9 @@ def construirEntradas(red, origen="uk1.uk", destino="gr1.gr"):
         "voronoi": {"sites": red["coords"],
                     "bounds": [min(longitudes) - margen, min(latitudes) - margen, max(longitudes) + margen, max(latitudes) + margen],
                     "queries": red["coords"][:3]},
+        "propagation": {"n": len(red["nombres"]), "edges": aristas, "delays": retardosEnlaces(red),
+                        "hopDelay": RETARDO_PROCESAMIENTO_MS, "metric": "time",
+                        "source": red["indice"][origen], "target": red["indice"][destino]},
     }
     if len(transmisiones) >= 2:
         firmas = [transmisiones[0][16:24], transmisiones[1][32:40], SEMILLA_FIRMAS[0]]
