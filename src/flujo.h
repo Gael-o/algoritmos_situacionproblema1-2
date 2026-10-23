@@ -251,7 +251,9 @@ void determinarExtremos(const JsonValue& entrada, const Grafo& grafo, int& fuent
 	}
 }
 
+#ifdef SENTINEL_APP
 /*
+ * Solo se compila con -DSENTINEL_APP (lo usa la aplicacion para pintar el flujo en el mapa).
  * Agrega a la respuesta el detalle del flujo ya calculado: cuanto pasa por cada arista (flows, en
  * el mismo orden de la entrada, como [origen, destino, flujo, capacidad]; el flujo es negativo si
  * va del destino hacia el origen de la arista), el corte minimo (las aristas con capacidad que
@@ -308,12 +310,13 @@ void agregarDetalleFlujo(const Grafo& grafo, const RedFlujo& red, int fuente, bo
 	agregarCampo(respuesta, "minCutCapacity", crearNumero(capacidadCorte));
 	agregarCampo(respuesta, "sourceSide", ladoFuente);
 }
+#endif
 
 /*
  * Resuelve el modo de flujo maximo: lee la red con capacidades y calcula el flujo de fuente a sumidero.
  * Parametro entrada: objeto JSON del campo input (aristas con capacidad, fuente y sumidero).
- * Retorno: respuesta JSON con el valor del flujo maximo y su detalle por arista, o un error si la
- * entrada no se reconoce.
+ * Retorno: respuesta JSON con el valor del flujo maximo (y, con -DSENTINEL_APP, su detalle por
+ * arista), o un error si la entrada no se reconoce.
  */
 JsonValue resolverFlujoMaximo(const JsonValue& entrada) {
 	Grafo grafo;
@@ -356,7 +359,9 @@ JsonValue resolverFlujoMaximo(const JsonValue& entrada) {
 		agregarCampo(respuesta, "max_flow", crearNumero(valor));
 		agregarCampo(respuesta, "flow", crearNumero(valor));
 		agregarCampo(respuesta, "value", crearNumero(valor));
+#ifdef SENTINEL_APP
 		agregarDetalleFlujo(grafo, red, fuente, dirigido, respuesta);
+#endif
 	}
 	return respuesta;
 }

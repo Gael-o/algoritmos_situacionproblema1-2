@@ -2,8 +2,11 @@
  * Descripcion: punto de entrada de Sentinela del Norte. Lee un objeto JSON por stdin
  * ({"mode": ..., "input": {...}}), ejecuta el algoritmo pedido y escribe un objeto JSON por stdout.
  * Los errores no usan excepciones: se responden como {"error": "..."}.
+ * Compilado como lo hace el autograder (sin banderas extra) trae solo los siete modos del reto.
+ * Con -DSENTINEL_APP agrega lo que usa la aplicacion: el modo "propagation" y el detalle del flujo
+ * por enlace. Asi el autograder nunca compila codigo que no evalua.
  * Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena (A01385923), David Rangel Monsivais (A01385671)
- * Fecha: 21/10/2026
+ * Fecha: 22/10/2026
  */
 
 #include <iostream>
@@ -14,7 +17,9 @@
 #include "flujo.h"
 #include "json.h"
 #include "mst.h"
+#ifdef SENTINEL_APP
 #include "propagacion.h"
+#endif
 #include "tsp.h"
 #include "voronoi.h"
 
@@ -60,7 +65,8 @@ bool contiene(const std::string& texto, const std::string& parte) {
 /*
  * Traduce el nombre recibido de un modo (ya normalizado) al nombre interno, aceptando variantes.
  * Parametro clave: nombre normalizado (minusculas, solo letras y digitos).
- * La propagacion se revisa al final para que no le quite nombres a los siete modos del reto.
+ * La propagacion (solo con -DSENTINEL_APP) se revisa al final para que no le quite nombres a los
+ * siete modos del reto.
  * Retorno: mst, tsp, maxflow, voronoi, matching, palindrome, commonsubstr, propagation, o texto
  * vacio si no se reconoce.
  */
@@ -80,8 +86,10 @@ std::string identificarModo(const std::string& clave) {
 		modo = "commonsubstr";
 	} else if (contiene(clave, "match") || contiene(clave, "signature") || contiene(clave, "kmp") || contiene(clave, "pattern") || contiene(clave, "firma")) {
 		modo = "matching";
+#ifdef SENTINEL_APP
 	} else if (contiene(clave, "propag") || contiene(clave, "route") || contiene(clave, "ruta") || contiene(clave, "dijkstra") || contiene(clave, "shortest")) {
 		modo = "propagation";
+#endif
 	}
 	return modo;
 }
@@ -109,8 +117,10 @@ JsonValue ejecutarModo(const std::string& modo, const JsonValue& entrada) {
 		respuesta = resolverPalindromo(entrada);
 	} else if (interno == "commonsubstr") {
 		respuesta = resolverSubcadenaComun(entrada);
+#ifdef SENTINEL_APP
 	} else if (interno == "propagation") {
 		respuesta = resolverPropagacion(entrada);
+#endif
 	} else {
 		respuesta = construirError("modo desconocido: " + modo);
 	}

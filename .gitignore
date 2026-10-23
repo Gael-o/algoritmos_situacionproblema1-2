@@ -1,5 +1,7 @@
 sentinel
 sentinel.exe
+sentinel_app
+sentinel_app.exe
 *.o
 *.out
 build/

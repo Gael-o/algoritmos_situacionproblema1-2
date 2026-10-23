@@ -1,6 +1,7 @@
 # Pruebas
 
-- `bash tests/ejecutarPruebas.sh`: compila y verifica 28 casos conocidos de los 8 modos (incluye los ejemplos oficiales de la pagina).
+- `bash tests/ejecutarPruebas.sh`: compila las dos versiones y verifica 33 casos conocidos: 21 con la version del autograder (los siete modos, los ejemplos oficiales de la pagina y dos pruebas de guardia que fallan si algo de la aplicacion se cuela en esa version) y 12 con la de la aplicacion (`-DSENTINEL_APP`: propagacion y detalle del flujo).
+- `equivalencia.py` y `estres.py` reciben el ejecutable: con `./sentinel_app` prueban los ocho modos; con `./sentinel`, los siete del autograder, y avisan que omiten la propagacion.
 - `python3 tests/equivalencia.py ./sentinel`: comprueba que las dos tecnicas de cada modo den el mismo resultado en cientos de casos aleatorios. En propagacion, Dijkstra y Bellman-Ford deben dar el mismo arbol completo (distancias, saltos, padres y tiempos), no solo la misma distancia.
 - `python3 tests/estres.py ./sentinel`: compara contra fuerza bruta (palindromos, subcadena comun, TSP pequeno) y contra implementaciones de referencia en Python (flujo con Edmonds-Karp, propagacion con Floyd-Warshall con fallas al azar), revisa el detalle del flujo (capacidades, conservacion, corte minimo igual al flujo y que el corte separe fuente y sumidero) y que las celdas de Voronoi sumen el area del dominio.
 - `python3 tests/benchmark.py ./sentinel results/`: genera los benchmarks.

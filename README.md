@@ -1,6 +1,6 @@
 # Sentinela del Norte - TC2038
 
-Siete algoritmos en C++ (MST, TSP, flujo maximo, Voronoi, firmas con KMP, palindromo mas largo y subcadena comun mas larga) que se comunican por JSON, y una aplicacion que los ejecuta sobre datos reales de la red GEANT (SNDlib). Como extra, un octavo modo, `propagation`, simula como viaja un mensaje por la red (Dijkstra o Bellman-Ford, con enlaces y nodos caidos) para la simulacion tipo Packet Tracer de la aplicacion.
+Siete algoritmos en C++ (MST, TSP, flujo maximo, Voronoi, firmas con KMP, palindromo mas largo y subcadena comun mas larga) que se comunican por JSON, y una aplicacion que los ejecuta sobre datos reales de la red GEANT (SNDlib). Como extra, solo en la version de la aplicacion, un octavo modo, `propagation`, simula como viaja un mensaje por la red (Dijkstra o Bellman-Ford, con enlaces y nodos caidos) para la simulacion tipo Packet Tracer (ver "Dos versiones del mismo programa").
 
 ## Contenido de la entrega
 
@@ -13,6 +13,27 @@ Siete algoritmos en C++ (MST, TSP, flujo maximo, Voronoi, firmas con KMP, palind
 | `README.md` | Este archivo |
 | `team.txt` | Integrantes, matriculas y contribuciones |
 | `ReflexSENTINEL_A01385956.pdf` | Documento de reflexion: modelos, alternativas, correctitud, complejidad, experimentos y estandares |
+
+## Inicio rapido
+
+Desde la raiz del repositorio:
+
+```
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic src/main.cpp -o sentinel    # compilar igual que el autograder
+python3 app/server.py                                                  # levantar la aplicacion
+```
+
+Abrir http://localhost:8000 en el navegador y dejar la terminal abierta (Ctrl+C para apagarla). La primera vez,
+el servidor compila solo su version, `sentinel_app` (el mismo `src/main.cpp` con `-DSENTINEL_APP`); no hay que
+hacer nada mas. En Windows se usa `python` en lugar de `python3`, y los ejecutables quedan como `sentinel.exe` y
+`sentinel_app.exe`. Si el puerto 8000 esta ocupado: `python3 app/server.py 8080` y abrir http://localhost:8080.
+
+Para probar un modo sin la aplicacion, y para correr las pruebas:
+
+```
+echo '{"mode":"mst","input":{"edges":[[0,1,4],[0,2,1],[1,2,2]]}}' | ./sentinel
+bash tests/ejecutarPruebas.sh
+```
 
 ## Instalacion y dependencias
 
@@ -36,6 +57,29 @@ Con las mismas opciones que usa el autograder (solo se compila `src/main.cpp`; l
 g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic src/main.cpp -o sentinel
 ```
 
+La version de la aplicacion es el mismo archivo con una bandera mas (el servidor la compila solo):
+
+```
+g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic -DSENTINEL_APP src/main.cpp -o sentinel_app
+```
+
+## Dos versiones del mismo programa
+
+El codigo que la aplicacion necesita y el autograder no evalua (el modo `propagation` en `src/propagacion.h` y el
+detalle del flujo por enlace en `src/flujo.h`) esta dentro de `#ifdef SENTINEL_APP`:
+
+- **Sin la bandera** (como compila el autograder) el programa trae solo los siete modos del reto. Comparando la
+  salida del preprocesador (`g++ -E`), lo que compila el autograder es identico, linea por linea, a la version
+  anterior del proyecto mas la correccion de matching.
+- **Con `-DSENTINEL_APP`** se agregan la propagacion y el flujo por enlace. Los siete modos son el mismo codigo; la
+  unica diferencia visible es que flujo maximo devuelve campos extra.
+
+Por que: con todo el codigo nuevo compilado, el autograder dio 100/100 con el tiempo extendido, pero en el tiempo
+normal (8 s) MST, TSP y flujo se quedaron sin tiempo en su primer caso, aunque sus resultados eran identicos a los
+de la version anterior. Separar el codigo deja al autograder exactamente con el programa que ya pasaba en tiempo
+normal. `tests/ejecutarPruebas.sh` compila las dos versiones y tiene pruebas de guardia que fallan si algo de la
+aplicacion se cuela en la version del autograder.
+
 ## Ejecucion
 
 El ejecutable lee **un** objeto JSON por stdin y escribe **un** objeto JSON por stdout:
@@ -53,7 +97,7 @@ Si algo falla responde `{"error": "..."}` (nunca usa excepciones: el compilador 
 | `mst` | Kruskal con Union-Find | `prim` (cola de prioridad) | O(E log E) | O(V + E) |
 | `tsp` | Held-Karp exacto hasta 16 nodos; si no, vecino mas cercano + 2-opt | `heldkarp`, `2opt`, `nn` | O(n^2 2^n) exacto; O(n^2) por pasada de 2-opt | O(n 2^n) exacto; O(n^2) aproximado |
 | `maxflow` | Dinic | `edmondskarp` | O(V^2 E) contra O(V E^2) | O(V + E) |
-| `propagation` (extra) | Dijkstra con cola de prioridad | `bellmanford` | O((V + E) log V) contra O(V E) | O(V + E) |
+| `propagation` (extra, solo `-DSENTINEL_APP`) | Dijkstra con cola de prioridad | `bellmanford` | O((V + E) log V) contra O(V E) | O(V + E) |
 | `voronoi` | Recorte del dominio con el semiplano de cada sitio | `sorted` (vecinos ordenados con corte anticipado) | O(n^2 k), k = vertices por celda | O(n k) la salida, O(k) de trabajo por celda |
 | `matching` | KMP (primera posicion de cada firma) | `naive` | O(n + m) contra O(n m) | O(m) la tabla de fallos; O(1) la ingenua |
 | `palindrome` | Manacher | `expand` (expandir por centros) | O(n) contra O(n^2) | O(n) contra O(1) |
@@ -76,7 +120,7 @@ Detalle de donde sale cada cota de memoria:
 Notas de diseno:
 
 - Todas las posiciones de cadenas son **base 1** y los rangos incluyen los dos extremos. Matching devuelve en `matches` una matriz con una fila por transmision y una columna por firma, con `-1` si la firma no aparece (`[[13,11,-1],[11,9,-1]]` en el ejemplo oficial). El campo `positions` conserva el formato anterior (`{"found":true,"position":p}` o `{"found":false}`) para las pruebas propias.
-- Flujo maximo, ademas del valor, devuelve el detalle: `flows` (cuanto pasa por cada arista, en el orden de la entrada), `minCut` (las aristas del corte minimo), `minCutCapacity` (que siempre es igual al flujo maximo) y `sourceSide`. Con `"directed": false` cada arista se puede usar en los dos sentidos.
+- En la version de la aplicacion, flujo maximo devuelve ademas el detalle: `flows` (cuanto pasa por cada arista, en el orden de la entrada), `minCut` (las aristas del corte minimo), `minCutCapacity` (que siempre es igual al flujo maximo) y `sourceSide`. Con `"directed": false` cada arista se puede usar en los dos sentidos.
 - Propagacion recibe `edges`, `source` y, opcionales, `target`, `delays` (retardo de cada arista en ms), `hopDelay` (procesamiento por salto), `metric` (`weight`, `hops` o `time`), `failedLinks`, `failedNodes` y `algorithm`. Devuelve el estado de cada nodo, la lista de llegadas en orden de tiempo (`events`), los nodos que quedaron aislados y, si hay destino, la ruta. Ante caminos empatados gana el de menos saltos y luego el de padre con indice menor, para que Dijkstra y Bellman-Ford elijan el mismo arbol.
 - En palindromos y subcadena comun, ante empate se elige el que queda mas a la izquierda.
 - TSP: si el grafo no es completo se calcula antes el camino minimo entre todos los pares (Floyd-Warshall) para visitar cada nodo una vez; la ruta devuelta tiene n + 1 nodos (regresa al inicio).
@@ -95,7 +139,7 @@ Notas de diseno:
 | `src/tsp.h` | Floyd-Warshall, Held-Karp, vecino mas cercano y 2-opt | Gael |
 | `src/flujo.h` | Dinic y Edmonds-Karp | Damian Gomez |
 | `src/voronoi.h` | Celdas de Voronoi y consulta del sitio mas cercano | Damian Gomez |
-| `src/propagacion.h` | Propagacion de un mensaje: Dijkstra y Bellman-Ford con fallas y retardos (extra para la aplicacion) | Equipo |
+| `src/propagacion.h` | Propagacion de un mensaje: Dijkstra y Bellman-Ford con fallas y retardos (solo con `-DSENTINEL_APP`) | Equipo |
 | `src/cadenas.h` | KMP, Manacher y subcadena comun mas larga | David Rangel |
 | `app/` | Interfaz web y pipeline GEANT | David Rangel |
 
@@ -104,14 +148,16 @@ Las pruebas (`tests/`), los benchmarks (`results/`) y la revision del estandar d
 ## Pruebas
 
 ```
-bash tests/ejecutarPruebas.sh          # 28 casos conocidos, incluidos los ejemplos oficiales de la pagina
-python3 tests/equivalencia.py ./sentinel   # las dos tecnicas de cada modo dan lo mismo (casos aleatorios)
-python3 tests/estres.py ./sentinel         # compara contra fuerza bruta y contra implementaciones de referencia
+bash tests/ejecutarPruebas.sh              # 33 casos: 21 de la version del autograder y 12 de la aplicacion
+python3 tests/equivalencia.py ./sentinel_app   # las dos tecnicas de cada modo dan lo mismo (casos aleatorios)
+python3 tests/estres.py ./sentinel_app         # compara contra fuerza bruta y contra implementaciones de referencia
 ```
 
-`estres.py` revisa tambien el detalle del flujo (capacidades respetadas, conservacion en cada nodo, corte
-minimo igual al flujo maximo y que el corte de verdad separe la fuente del sumidero) y compara la
-propagacion contra Floyd-Warshall escrito en Python, con enlaces y nodos caidos al azar y las tres metricas.
+Con `./sentinel` (la version del autograder) `equivalencia.py` y `estres.py` prueban los siete modos y avisan
+que omiten la propagacion. Con `./sentinel_app` prueban todo: `estres.py` revisa tambien el detalle del flujo
+(capacidades respetadas, conservacion en cada nodo, corte minimo igual al flujo maximo y que el corte de verdad
+separe la fuente del sumidero) y compara la propagacion contra Floyd-Warshall escrito en Python, con enlaces y
+nodos caidos al azar y las tres metricas.
 
 ## Benchmarks
 
@@ -142,6 +188,7 @@ memoria y se ve en los numeros, y una tecnica mas elaborada (Voronoi ordenado) p
 - [x] PDF de reflexion (`ReflexSENTINEL_A01385956.pdf`)
 - [x] Formato de salida de matching corregido tras la revision con el profesor
 - [x] Mejoras de la aplicacion pedidas en la revision: barra de menus, zoom, simulacion de propagacion y flujo pintado en el mapa
+- [x] El codigo exclusivo de la aplicacion queda fuera de la version del autograder (`-DSENTINEL_APP`)
 
 ## Formato de matching
 
@@ -158,8 +205,8 @@ ninguno de los once intentos combinaba:
 - una firma ausente se marca con **-1**, no con 0 ni con un objeto.
 
 `resolverFirmas` (`src/cadenas.h`) arma ahora esa matriz en el campo `matches`: `[[13,11,-1],[11,9,-1]]` en el
-ejemplo oficial. El algoritmo no cambio. Falta confirmar el resultado corriendo de nuevo el autograder en linea
-con esta version.
+ejemplo oficial. El algoritmo no cambio. Confirmado en el autograder: matching pasa sus 2 casos (8/8 puntos), y la
+corrida completa dio 25/25 casos y 100/100 con el tiempo extendido.
 
 ## Estandar de codificacion
 

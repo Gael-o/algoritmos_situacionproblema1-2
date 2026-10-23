@@ -6,6 +6,9 @@ def run(mode, inp):
 EJECUTABLE = sys.argv[1] if len(sys.argv) > 1 else "./sentinel"
 random.seed(7)
 bad = 0
+# La propagacion y el detalle del flujo solo existen en la version de la aplicacion (-DSENTINEL_APP).
+APP = "error" not in run("propagation", {"n": 2, "edges": [[0, 1, 1]], "source": 0})
+print("version:", "aplicacion (-DSENTINEL_APP)" if APP else "autograder (sin propagacion ni detalle de flujo)")
 # palindrome / lcs / kmp
 def brute_pal(s):
     best=(0,0)
@@ -101,14 +104,14 @@ for _ in range(200):
     s,t=0,n-1
     r=run("maxflow",{"n":n,"edges":[list(e) for e in edges],"source":s,"sink":t})
     if "maxFlow" not in r or r["maxFlow"]!=ek(n,edges,s,t): bad+=1; print("FLOW",n,edges,r,ek(n,edges,s,t))
-    elif not flow_detail_ok(n,edges,s,t,r,True): bad+=1; print("FLOW DETAIL",n,edges,r)
+    elif APP and not flow_detail_ok(n,edges,s,t,r,True): bad+=1; print("FLOW DETAIL",n,edges,r)
     both=[(u,v,c) for (u,v,c) in edges]+[(v,u,c) for (u,v,c) in edges]
     ru=run("maxflow",{"n":n,"edges":[list(e) for e in edges],"directed":False,"source":s,"sink":t})
-    if ru["maxFlow"]!=ek(n,both,s,t) or not flow_detail_ok(n,edges,s,t,ru,False): bad+=1; print("FLOW UNDIRECTED",n,edges,ru)
+    if ru["maxFlow"]!=ek(n,both,s,t) or (APP and not flow_detail_ok(n,edges,s,t,ru,False)): bad+=1; print("FLOW UNDIRECTED",n,edges,ru)
 print("flow bad:",bad)
 # propagation (caminos minimos con fallas) vs Floyd-Warshall en Python
 bad=0
-for _ in range(300):
+for _ in range(300 if APP else 0):
     n=random.randint(1,14)
     edges=[[random.randrange(n),random.randrange(n),random.randint(1,9)] for _ in range(random.randint(0,3*n))]
     edges=[e for e in edges if e[0]!=e[1]]
@@ -142,7 +145,7 @@ for _ in range(300):
                 elif abs(x["time"]-nodes[p]["time"]-delays[e]-hop)>1e-9: ok=False
         if [e["node"] for e in r["events"]]!=sorted([v for v in range(n) if nodes[v]["reachable"]],key=lambda v:(nodes[v]["time"],v)): ok=False
     if not ok: bad+=1; print("PROP",algo,n,edges,src,fl,fn,r)
-print("propagation bad:",bad)
+print("propagation bad:",bad) if APP else print("propagation: omitida (corre con ./sentinel_app para probarla)")
 # voronoi: areas sum and nearest check
 bad=0
 for _ in range(30):

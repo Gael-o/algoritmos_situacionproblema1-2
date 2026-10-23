@@ -2,11 +2,15 @@
 """
 Descripcion: servidor local de la aplicacion SENTINEL. Entrega la pagina web y ejecuta el programa en C++
 para cada consulta (la interfaz no calcula nada de los algoritmos: todo pasa por el ejecutable).
+La aplicacion usa sentinel_app: el mismo src/main.cpp compilado con -DSENTINEL_APP, que ademas de los
+siete modos trae la propagacion y el detalle del flujo. El servidor lo compila solo si falta o si algun
+archivo de src/ cambio despues. El autograder compila src/main.cpp sin esa bandera.
 Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena (A01385923), David Rangel Monsivais (A01385671)
-Fecha: 21/10/2026
+Fecha: 22/10/2026
 
-Uso (desde la raiz del repositorio, despues de compilar ./sentinel):
+Uso (desde la raiz del repositorio):
     python3 app/server.py            # abre http://localhost:8000 (en Windows: python app/server.py)
+    python3 app/server.py 8080       # otro puerto, si el 8000 esta ocupado
 """
 
 import json
@@ -20,10 +24,46 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import geant
 
 RAIZ = os.path.dirname(os.path.abspath(__file__))
-EJECUTABLE = os.path.join(os.path.dirname(RAIZ), "sentinel")
-if not os.path.exists(EJECUTABLE) and os.path.exists(EJECUTABLE + ".exe"):
-    EJECUTABLE = EJECUTABLE + ".exe"
+REPOSITORIO = os.path.dirname(RAIZ)
+FUENTES = os.path.join(REPOSITORIO, "src")
+EXTENSION = ".exe" if os.name == "nt" else ""
+EJECUTABLE_APP = os.path.join(REPOSITORIO, "sentinel_app" + EXTENSION)
+EJECUTABLE_AUTOGRADER = os.path.join(REPOSITORIO, "sentinel" + EXTENSION)
+COMANDO_APP = ["g++", "-std=c++17", "-O2", "-DSENTINEL_APP", os.path.join(FUENTES, "main.cpp"), "-o", EJECUTABLE_APP]
 ESCENARIO_POR_DEFECTO = "01_geant_completo"
+EJECUTABLE = EJECUTABLE_APP
+
+
+def ejecutableAlDia():
+    """True si sentinel_app existe y es mas nuevo que todos los archivos de src/."""
+    alDia = os.path.exists(EJECUTABLE_APP)
+    if alDia:
+        marca = os.path.getmtime(EJECUTABLE_APP)
+        alDia = all(os.path.getmtime(os.path.join(FUENTES, nombre)) <= marca for nombre in os.listdir(FUENTES))
+    return alDia
+
+
+def prepararEjecutable():
+    """Compila sentinel_app si hace falta. Devuelve la ruta del ejecutable que usara la aplicacion,
+    o None si no hay ninguno. Si no se puede compilar, usa ./sentinel (sin propagacion ni flujo en el mapa)."""
+    elegido = EJECUTABLE_APP
+    if not ejecutableAlDia():
+        print("Compilando la version de la aplicacion (src/main.cpp con -DSENTINEL_APP)...")
+        try:
+            proceso = subprocess.run(COMANDO_APP, capture_output=True, text=True)
+            compilo = proceso.returncode == 0
+            if not compilo:
+                print(proceso.stderr)
+        except FileNotFoundError:
+            compilo = False
+            print("No se encontro g++ en esta computadora.")
+        if not compilo:
+            print("No se pudo compilar. Comando manual:")
+            print("    g++ -std=c++17 -O2 -DSENTINEL_APP src/main.cpp -o sentinel_app")
+            elegido = EJECUTABLE_AUTOGRADER if os.path.exists(EJECUTABLE_AUTOGRADER) else None
+            if elegido:
+                print("Por ahora se usa ./sentinel: la simulacion de propagacion y el flujo en el mapa no van a funcionar.")
+    return elegido
 
 
 def descripcionRed(red):
@@ -88,8 +128,10 @@ class Manejador(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    if not os.path.exists(EJECUTABLE):
-        print("Primero compila: g++ -std=c++17 -O2 src/main.cpp -o sentinel")
+    EJECUTABLE = prepararEjecutable()
+    if EJECUTABLE is None:
+        print("No hay ejecutable. Compila desde la raiz del repositorio:")
+        print("    g++ -std=c++17 -O2 -DSENTINEL_APP src/main.cpp -o sentinel_app")
         sys.exit(1)
     puerto = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     print("SENTINEL listo en http://localhost:%d  (Ctrl+C para salir)" % puerto)

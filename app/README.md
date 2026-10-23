@@ -1,6 +1,8 @@
 # Aplicacion SENTINEL Digital Twin
 
-Interfaz web sobre la red GEANT (SNDlib). **No calcula nada por su cuenta**: cada consulta ejecuta el programa en C++ (`./sentinel`) con el mismo JSON de entrada y salida que usa el autograder.
+Interfaz web sobre la red GEANT (SNDlib). **No calcula nada por su cuenta**: cada consulta ejecuta el programa en C++ con el mismo JSON de entrada y salida que usa el autograder.
+
+El programa que usa la aplicacion es `sentinel_app`: el mismo `src/main.cpp` compilado con `-DSENTINEL_APP`, que ademas de los siete modos trae la propagacion y el flujo por enlace. **El servidor lo compila solo** la primera vez, y otra vez si cambia algun archivo de `src/`. El autograder compila sin esa bandera (ver "Dos versiones del mismo programa" en el README principal).
 
 ## Requisitos
 
@@ -12,11 +14,15 @@ Interfaz web sobre la red GEANT (SNDlib). **No calcula nada por su cuenta**: cad
 Desde la raiz del repositorio:
 
 ```
-g++ -std=c++17 -O2 -Wall -Wextra -Wpedantic src/main.cpp -o sentinel
-python3 app/server.py   (en Windows: python app/server.py, y el programa se llama sentinel.exe)
+python3 app/server.py   (en Windows: python app/server.py)
 ```
 
-Abrir http://localhost:8000 en cualquier navegador y **dejar esa terminal abierta**; para apagarlo, Ctrl+C.
+La primera vez muestra "Compilando la version de la aplicacion..." y tarda unos segundos. Luego abrir
+http://localhost:8000 en cualquier navegador y **dejar esa terminal abierta**; para apagarlo, Ctrl+C.
+
+Si no hay `g++` disponible, el servidor lo dice, muestra el comando para compilar a mano
+(`g++ -std=c++17 -O2 -DSENTINEL_APP src/main.cpp -o sentinel_app`) y, si existe `./sentinel`, arranca con ese:
+todo funciona menos la simulacion de propagacion y el flujo pintado en el mapa.
 
 Si el puerto 8000 esta ocupado (por ejemplo, porque quedo corriendo otra copia del servidor), se puede usar otro:
 
@@ -109,7 +115,8 @@ se quitan), `flujo` (origen y destino), `transmisiones`, `firmas` o `generar` (r
 ## Pipeline sin interfaz
 
 ```
-python3 app/geant.py ./sentinel            # imprime los resultados y guarda results/geant_resultados.json
+python3 app/geant.py ./sentinel_app        # imprime los resultados y guarda results/geant_resultados.json
 ```
 
 Corre los ocho modos sobre la red real, incluida la propagacion desde el origen del caso con los retardos reales.
+Con `./sentinel` corre los siete modos del autograder (la propagacion responde "modo desconocido").

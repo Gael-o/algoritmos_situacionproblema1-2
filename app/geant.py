@@ -6,8 +6,9 @@ Autores: Gael Alexander Zaragoza Torres (A01385956), Damian Alejandro Gomez Mena
 Fecha: 21/10/2026
 
 Uso:
-    python3 app/geant.py ./sentinel                 # usa app/data/demands.txt si existe
-    python3 app/geant.py ./sentinel ruta/demanda.txt
+    python3 app/geant.py ./sentinel_app             # los ocho modos (la app compila sentinel_app con -DSENTINEL_APP)
+    python3 app/geant.py ./sentinel                 # los siete modos del autograder (la propagacion responde error)
+    python3 app/geant.py ./sentinel_app ruta/demanda.txt
 
 Archivos de datos (carpeta app/data):
     nodes.txt    lineas "nombre ( lon lat )"              (sacadas de geant.txt de SNDlib, seccion NODES)

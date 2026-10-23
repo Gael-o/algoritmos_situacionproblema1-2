@@ -1437,6 +1437,14 @@ HERRAMIENTAS.flujo = tablero => {
 			mostrarError(resultado, salida);
 			return;
 		}
+		if (!salida.flows) {
+			estado.capa = {mostrarExtremos: true, usaDestino: true};
+			resultado.textContent = "";
+			resultado.appendChild(crear("p", {class: "grande"}, formatoMiles(salida.maxFlow) + " Mbit/s"));
+			resultado.appendChild(crear("p", {class: "aviso"}, "El servidor está usando la versión del autograder, que no trae el flujo por enlace. Para pintarlo en el mapa compila la versión de la app: g++ -std=c++17 -O2 -DSENTINEL_APP src/main.cpp -o sentinel_app"));
+			pedirDibujo();
+			return;
+		}
 		estado.capa = {
 			mostrarExtremos: true,
 			usaDestino: true,

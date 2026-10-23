@@ -38,7 +38,11 @@ for _ in range(150):
         e = {"n": n, "edges": aristas, "source": 0, "sink": n - 1}
         comprobar("flujo", correr("maxflow", e, "dinic")["maxFlow"] == correr("maxflow", e, "edmondskarp")["maxFlow"], e)
 
-for _ in range(150):
+# La propagacion solo existe en la version de la aplicacion (-DSENTINEL_APP).
+APP = "error" not in correr("propagation", {"n": 2, "edges": [[0, 1, 1]], "source": 0}, "dijkstra")
+if not APP:
+    print("Propagacion omitida: es de la version de la aplicacion (corre con ./sentinel_app para probarla)")
+for _ in range(150 if APP else 0):
     n = random.randint(1, 25)
     aristas = [[random.randrange(n), random.randrange(n), random.randint(1, 6)] for _ in range(random.randint(0, 3 * n))]
     aristas = [a for a in aristas if a[0] != a[1]]
